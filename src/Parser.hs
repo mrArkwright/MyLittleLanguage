@@ -9,8 +9,7 @@ import qualified Lexer as L
 import Syntax
 
 
-
---{– -------- top level -------- –}
+{- -------- top level -------- -}
 myLittleLanguageParser :: Parser [Def]
 myLittleLanguageParser = do
   L.whiteSpace
