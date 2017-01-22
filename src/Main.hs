@@ -18,7 +18,7 @@ main = do
   args <- getArgs
   case args of
     []           -> repl
-    (fileName:_) -> parseFile fileName
+    (fileName:_) -> processFile fileName
 
 
 {- -------- REPL -------- -}
@@ -32,6 +32,15 @@ repl = do
         Nothing    -> outputStrLn "Goodbye."
         Just input -> (liftIO $ process input) >> loop
 
+
+{- -------- process file -------- -}
+processFile :: String -> IO ()
+processFile fileName = do
+  fileContent <- readFile fileName
+  process fileContent
+
+
+{- -------- process -------- -}
 process :: String -> IO ()
 process line = do
   let result = parse myLittleLanguageParser "<stdin>" line
@@ -39,11 +48,3 @@ process line = do
     Left  error       -> print error
     Right expressions -> mapM_ print expressions
 
-
-{- -------- file parsing -------- -}
-parseFile :: String -> IO ()
-parseFile fileName = do
-  result <- parseFromFile myLittleLanguageParser fileName
-  case result of
-    Left  error       -> print error
-    Right expressions -> mapM_ print expressions
