@@ -9,7 +9,6 @@ import qualified Lexer as L
 import Syntax
 
 
-{- -------- top level -------- -}
 myLittleLanguageParser :: Parser [Def]
 myLittleLanguageParser = do
   L.whiteSpace
@@ -18,17 +17,14 @@ myLittleLanguageParser = do
   return definitions
 
 
-{- -------- definitions -------- -}
+
+--------------------------------------------------------------------------------
+-- definitions
+--------------------------------------------------------------------------------
+
 definition :: Parser Def
 definition = try extern
          <|> try function
-
-extern :: Parser Def
-extern = do
-  L.reserved "extern"
-  name <- L.identifier
-  args <- L.parens $ many L.identifier
-  return $ Extern name args
 
 function :: Parser Def
 function = do
@@ -38,8 +34,19 @@ function = do
   body <- expr
   return $ Function name args body
 
+extern :: Parser Def
+extern = do
+  L.reserved "extern"
+  name <- L.identifier
+  args <- L.parens $ many L.identifier
+  return $ Extern name args
 
-{- -------- expressions -------- -}
+
+
+--------------------------------------------------------------------------------
+-- expressions
+--------------------------------------------------------------------------------
+
 expr :: Parser Expr
 expr = buildExpressionParser opTable factor
 
@@ -49,10 +56,10 @@ factor = try float
      <|> variable
      <|> L.parens expr
 
-binary s f assoc = Infix (L.reservedOp s >> return (BinOp f)) assoc
+binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call s [x, y])) assoc
 
-opTable = [[binary "*" Times AssocLeft, binary "/" Divide AssocLeft],
-         [binary "+" Plus AssocLeft, binary "-" Minus AssocLeft]]
+opTable = [[binary "*" AssocLeft, binary "/" AssocLeft],
+         [binary "+" AssocLeft, binary "-" AssocLeft]]
 
 float :: Parser Expr
 float = do

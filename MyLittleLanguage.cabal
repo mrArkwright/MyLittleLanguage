@@ -5,9 +5,9 @@ description:         Please see README.md
 homepage:            https://github.com/githubuser/MyLittleLanguage#readme
 license:             BSD3
 license-file:        LICENSE
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2017 Author name here
+author:              Jannik Theiß
+maintainer:          jnkthss.dev@icloud.com
+copyright:           2017 Jannik Theiß
 category:            Web
 build-type:          Simple
 cabal-version:       >=1.10
@@ -19,7 +19,11 @@ executable MyLittleLanguage
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5
                      , mtl
+                     , bytestring
+                     , containers
                      , haskeline
                      , parsec
+                     , llvm-general-pure
+                     , llvm-general
   
-  other-modules:       Lexer, Syntax, Parser
+  other-modules:       Misc, Syntax, Lexer, Parser, Codegen, Compile

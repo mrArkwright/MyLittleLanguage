@@ -1,15 +1,19 @@
 module Main where
 
 import Control.Monad.Trans
-
+import Data.List
 import System.Environment
 import System.Console.Haskeline
 
 import Text.Parsec (parse)
 import Text.Parsec.String (parseFromFile)
 
+import qualified LLVM.General.AST as AST
+
 
 import Parser (myLittleLanguageParser)
+import Codegen
+import Compile
 
 
 
@@ -21,30 +25,59 @@ main = do
     (fileName:_) -> processFile fileName
 
 
-{- -------- REPL -------- -}
+
+--------------------------------------------------------------------------------
+-- REPL
+--------------------------------------------------------------------------------
+
 repl :: IO ()
 repl = do
   putStrLn "---- MyLittleLanguage REPL ----"
-  runInputT defaultSettings loop where
-    loop = do
+  runInputT defaultSettings (loop $ initModule "repl") where
+    loop astModule = do
       minput <- getInputLine "➜ "
       case minput of
         Nothing    -> outputStrLn "Goodbye."
-        Just input -> (liftIO $ process input) >> loop
+        Just ":q"  -> outputStrLn "Goodbye."
+        Just input -> do
+          newModule <- liftIO $ process astModule input
+          case newModule of
+            Nothing        -> loop astModule
+            Just newModule -> loop newModule
 
 
-{- -------- process file -------- -}
+
+--------------------------------------------------------------------------------
+-- process file
+--------------------------------------------------------------------------------
+
 processFile :: String -> IO ()
 processFile fileName = do
-  fileContent <- readFile fileName
-  process fileContent
+  source <- readFile fileName
+  let moduleName = init $ dropWhileEnd (/= '.') $ fileName
+  newModule <- process (initModule moduleName) source
+  case newModule of
+    Nothing -> return ()
+    Just newModule -> compile newModule
 
 
-{- -------- process -------- -}
-process :: String -> IO ()
-process line = do
-  let result = parse myLittleLanguageParser "<stdin>" line
-  case result of
-    Left  error       -> print error
-    Right expressions -> mapM_ print expressions
+
+--------------------------------------------------------------------------------
+-- common
+--------------------------------------------------------------------------------
+
+process :: AST.Module -> String -> IO (Maybe AST.Module)
+process astModule source = do
+  let program = parse myLittleLanguageParser "<stdin>" source
+  case program of
+    Left  error       -> print error >> return Nothing
+    Right definitions -> do
+      --putStrLn "---- Definitions ----"
+      --mapM_ (putStrLn . (++ "\n") . show) definitions
+
+      return $ Just $ codegen astModule definitions
+
+
+initModule :: String -> AST.Module
+initModule name = AST.defaultModule { AST.moduleName = name }
 
