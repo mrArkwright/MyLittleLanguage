@@ -72,8 +72,8 @@ process astModule source = do
   case program of
     Left  error       -> print error >> return Nothing
     Right definitions -> do
-      --putStrLn "---- Definitions ----"
-      --mapM_ (putStrLn . (++ "\n") . show) definitions
+      putStrLn "---- Definitions ----"
+      mapM_ (putStrLn . (++ "\n") . show) definitions
 
       return $ Just $ codegen astModule definitions
 

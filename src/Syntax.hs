@@ -10,6 +10,7 @@ data Def
 data Expr
   = Float Double
   | Var Name
+  | If Expr Expr Expr
   | Call Name [Expr]
   deriving (Eq, Ord, Show)
 

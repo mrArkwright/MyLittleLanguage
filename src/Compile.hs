@@ -18,8 +18,13 @@ compile astModule = withContext $ \context -> do
 
       let moduleName = AST.moduleName astModule
 
-      assembly <- moduleLLVMAssembly llvmModule
-      writeFile (moduleName ++ ".ll") assembly
+      llvmAssembly <- moduleLLVMAssembly llvmModule
+      writeFile (moduleName ++ ".ll") llvmAssembly
+
+      result <- runExceptT $ moduleTargetAssembly targetMachine llvmModule
+      case result of
+        Left error     -> putStrLn error
+        Right assembly -> writeFile (moduleName ++ ".s") assembly
 
       result <- runExceptT $ moduleObject targetMachine llvmModule
       case result of

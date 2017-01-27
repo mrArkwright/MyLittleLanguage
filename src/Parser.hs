@@ -54,12 +54,14 @@ factor :: Parser Expr
 factor = try float
      <|> try call
      <|> variable
+     <|> ifThenElse
      <|> L.parens expr
 
 binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call s [x, y])) assoc
 
 opTable = [[binary "*" AssocLeft, binary "/" AssocLeft],
-         [binary "+" AssocLeft, binary "-" AssocLeft]]
+         [binary "+" AssocLeft, binary "-" AssocLeft],
+         [binary "<" AssocLeft]]
 
 float :: Parser Expr
 float = do
@@ -70,6 +72,16 @@ variable :: Parser Expr
 variable = do
   name <- L.identifier
   return $ Var name
+
+ifThenElse :: Parser Expr
+ifThenElse = do
+  L.reserved "if"
+  condition <- expr
+  L.reserved "then"
+  ifTrue <- expr
+  L.reserved "else"
+  ifFalse <- expr
+  return $ If condition ifTrue ifFalse
 
 call :: Parser Expr
 call = do

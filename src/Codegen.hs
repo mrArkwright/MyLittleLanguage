@@ -11,6 +11,7 @@ import qualified LLVM.General.AST as AST
 import qualified LLVM.General.AST.Global as AST
 import qualified LLVM.General.AST.Constant as AST.C
 import qualified LLVM.General.AST.Float as AST
+import qualified LLVM.General.AST.FloatingPointPredicate as AST
 import qualified LLVM.General.AST.CallingConvention as AST
 import LLVM.General.AST.Instruction ( Named( (:=) ) )
 
@@ -54,33 +55,70 @@ addGlobalFunction name argNames basicBlocks = do
 --------------------------------------------------------------------------------
 
 data Function = Function {
-  blockName             :: AST.Name,
-  instructions          :: [AST.Named AST.Instruction],
-  terminator            :: Maybe (AST.Named AST.Terminator),
+  currentBasicBlock     :: BasicBlock,
+  basicBlocks           :: [BasicBlock],
+  symbols               :: Map.Map String AST.Operand,
   namedInstructionCount :: Word,
-  symbols               :: Map.Map String AST.Operand
+  labels                :: Map.Map String Int
   } deriving Show
 
 emptyFunction :: Function
 emptyFunction = Function {
-  blockName             = AST.Name "entry",
-  instructions          = [],
-  terminator            = Nothing,
+  currentBasicBlock     = emptyBasicBlock "entry",
+  basicBlocks           = [],
+  symbols               = Map.empty,
   namedInstructionCount = 0,
-  symbols               = Map.empty
+  labels                = Map.empty
+  }
+
+data BasicBlock = BasicBlock {
+  name         :: String,
+  instructions :: [AST.Named AST.Instruction],
+  terminator   :: Maybe (AST.Named AST.Terminator)
+  } deriving Show
+
+emptyBasicBlock :: String -> BasicBlock
+emptyBasicBlock name = BasicBlock {
+  name         =  name,
+  instructions = [],
+  terminator   = Nothing
   }
 
 codegenFunction :: [String] -> S.Expr -> [AST.BasicBlock]
-codegenFunction argNames body = fst $ runState' emptyFunction $ do
+codegenFunction argNames body = (flip evalState) emptyFunction $ do
   args <- mapM addLocalReference argNames
-  codegenExpression body >>= ret
+  result <- codegenExpression body
+  ret result
 
-  blockName' <- gets blockName
-  instructions' <- gets instructions
-  terminator' <- gets terminator
-  let terminator'' = maybeError terminator' ("Block has no terminator: " ++ (show blockName'))
-  return $ [AST.BasicBlock blockName' instructions' terminator'']
+  basicBlocks' <- gets basicBlocks
+  currentBasicBlock' <- gets currentBasicBlock
+  modify $ \s -> s { basicBlocks = basicBlocks' ++ [currentBasicBlock'] }
 
+  basicBlocks'' <- gets basicBlocks
+  return $ map basicBlockToLLVMBasicBlock basicBlocks''
+
+basicBlockToLLVMBasicBlock :: BasicBlock -> AST.BasicBlock
+basicBlockToLLVMBasicBlock (BasicBlock name' instructions' terminator') =
+  let terminator'' = maybeError terminator' ("Block has no terminator: " ++ (show name')) in
+  AST.BasicBlock (AST.Name name') instructions' terminator''
+
+newBasicBlock :: String -> State Function ()
+newBasicBlock name = do
+  basicBlocks' <- gets basicBlocks
+  currentBasicBlock' <- gets currentBasicBlock
+  modify $ \s -> s { basicBlocks = basicBlocks' ++ [currentBasicBlock'] }
+  modify $ \s -> s { currentBasicBlock = emptyBasicBlock name }
+
+makeUniqueLabel :: String -> State Function String
+makeUniqueLabel label = do
+  labels' <- gets labels
+  case Map.lookup label labels' of
+    Nothing    -> do
+      modify $ \s -> s { labels = Map.insert label 1 labels' }
+      return label
+    Just count -> do
+      modify $ \s -> s { labels = Map.insert label (count + 1) labels' }
+      return $ label ++ show count
 
 
 --------------------------------------------------------------------------------
@@ -92,15 +130,42 @@ codegenExpression (S.Float value) = return $ AST.ConstantOperand $ AST.C.Float (
 codegenExpression (S.Var name) = do
   reference <- getLocalReference name
   return $ maybeError reference ("no such symbol: " ++ name)
+codegenExpression (S.If condition ifTrue ifFalse) = do
+  thenLabel <- makeUniqueLabel "if.then"
+  elseLabel <- makeUniqueLabel "if.else"
+  contLabel <- makeUniqueLabel "if.cont"
+
+  conditionResult <- codegenExpression condition
+  condBr conditionResult thenLabel elseLabel
+
+  newBasicBlock thenLabel
+  trueResult <- codegenExpression ifTrue
+  br contLabel
+
+  newBasicBlock elseLabel
+  falseResult <- codegenExpression ifFalse
+  br contLabel
+
+  newBasicBlock contLabel
+  phi [(trueResult, thenLabel), (falseResult, elseLabel)]
 codegenExpression (S.Call name argExprs) = do
   args <- mapM codegenExpression argExprs
   case name of
     "+" -> do
       let (a:b:_) = args
       fadd a b
+    "-" -> do
+      let (a:b:_) = args
+      fsub a b
     "*" -> do
       let (a:b:_) = args
       fmul a b
+    "/" -> do
+      let (a:b:_) = args
+      fdiv a b
+    "<" -> do
+      let (a:b:_) = args
+      fcmp AST.ULT a b
     _   -> do
       let function = AST.ConstantOperand $ AST.C.GlobalReference double (AST.Name name)
       call function args
@@ -108,25 +173,50 @@ codegenExpression (S.Call name argExprs) = do
 fadd :: AST.Operand -> AST.Operand -> State Function AST.Operand
 fadd a b = addNamedInstruction $ AST.FAdd AST.NoFastMathFlags a b []
 
+fsub :: AST.Operand -> AST.Operand -> State Function AST.Operand
+fsub a b = addNamedInstruction $ AST.FSub AST.NoFastMathFlags a b []
+
 fmul :: AST.Operand -> AST.Operand -> State Function AST.Operand
 fmul a b = addNamedInstruction $ AST.FMul AST.NoFastMathFlags a b []
+
+fdiv :: AST.Operand -> AST.Operand -> State Function AST.Operand
+fdiv a b = addNamedInstruction $ AST.FDiv AST.NoFastMathFlags a b []
+
+fcmp :: AST.FloatingPointPredicate -> AST.Operand -> AST.Operand -> State Function AST.Operand
+fcmp condition a b = addNamedInstruction $ AST.FCmp condition a b []
 
 call :: AST.Operand -> [AST.Operand] -> State Function AST.Operand
 call fn args = addNamedInstruction $ AST.Call Nothing AST.C [] (Right fn) [(arg, []) | arg <- args] [] []
 
-ret :: AST.Operand -> State Function (AST.Named AST.Terminator)
+br :: String -> State Function ()
+br label = addTerminator $ AST.Do $ AST.Br (AST.Name label) []
+
+condBr :: AST.Operand -> String -> String -> State Function ()
+condBr condition trueLabel falseLabel =
+  let trueLabel'  = AST.Name trueLabel  in
+  let falseLabel' = AST.Name falseLabel in
+  addTerminator $ AST.Do $ AST.CondBr condition trueLabel' falseLabel' []
+
+phi :: [(AST.Operand, String)] -> State Function AST.Operand
+phi incoming =
+  let incoming' = map (\(operand, label) -> (operand, AST.Name label)) incoming in
+  addNamedInstruction $ AST.Phi double incoming' []
+
+ret :: AST.Operand -> State Function ()
 ret val = addTerminator $ AST.Do $ AST.Ret (Just val) []
 
 addNamedInstruction :: AST.Instruction -> State Function AST.Operand
 addNamedInstruction instruction = do
   n <- nextRegisterNumber
   let ref = (AST.UnName n)
-  modify $ \s -> s { instructions = instructions s ++ [ref := instruction] }
+  currentBasicBlock' <- gets currentBasicBlock
+  let currentBasicBlock'' = currentBasicBlock' { instructions = instructions currentBasicBlock' ++ [ref := instruction] }
+  modify $ \s -> s { currentBasicBlock = currentBasicBlock'' }
   return $ AST.LocalReference double ref
 
-addUnnamedInstruction :: AST.Instruction -> State Function ()
-addUnnamedInstruction instruction = do
-  modify $ \s -> s { instructions = instructions s ++ [AST.Do instruction] }
+--addUnnamedInstruction :: AST.Instruction -> State Function ()
+--addUnnamedInstruction instruction = do
+--  modify $ \s -> s { instructions = instructions s ++ [AST.Do instruction] }
 
 nextRegisterNumber :: State Function Word
 nextRegisterNumber = do
@@ -135,10 +225,11 @@ nextRegisterNumber = do
   modify $ \s -> s { namedInstructionCount = m }
   return m
 
-addTerminator :: AST.Named AST.Terminator -> State Function (AST.Named AST.Terminator)
+addTerminator :: AST.Named AST.Terminator -> State Function ()
 addTerminator trm = do
-  modify $ \s -> s { terminator = Just trm }
-  return trm
+  currentBasicBlock' <- gets currentBasicBlock
+  let currentBasicBlock'' = currentBasicBlock' { terminator = Just trm }
+  modify $ \s -> s { currentBasicBlock = currentBasicBlock'' }
 
 addLocalReference :: String -> State Function AST.Operand
 addLocalReference name = do

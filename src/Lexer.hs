@@ -36,8 +36,8 @@ whiteSpace = Tok.whiteSpace lexer
 
 lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser langDef where
-  ops = ["+", "*", "-"]
-  names = ["def", "extern"]
+  ops = ["+", "-", "*", "/", "<"]
+  names = ["def", "extern", "if", "then", "else"]
   langDef = emptyDef {
     Tok.commentLine = "#",
     Tok.reservedOpNames = ops,
