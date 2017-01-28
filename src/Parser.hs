@@ -55,6 +55,7 @@ factor = try float
      <|> try call
      <|> variable
      <|> ifThenElse
+     <|> doBlock
      <|> L.parens expr
 
 binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call s [x, y])) assoc
@@ -88,4 +89,34 @@ call = do
   name <- L.identifier
   args <- L.parens $ L.commaSep expr
   return $ Call name args
+
+doBlock :: Parser Expr
+doBlock = do
+  L.reserved "do"
+  statements <- many statement
+  L.reserved "end"
+  return $ Do statements
+
+
+
+--------------------------------------------------------------------------------
+-- statements
+--------------------------------------------------------------------------------
+
+statement :: Parser Statement
+statement = try expressionStatement
+        <|> letStatement
+
+expressionStatement :: Parser Statement
+expressionStatement = do
+  expression <- expr
+  return $ Expr expression
+
+letStatement :: Parser Statement
+letStatement = do
+  L.reserved "let"
+  name <- L.identifier
+  L.reserved "="
+  expression <- expr
+  return $ Let name expression
 

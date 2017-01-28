@@ -169,6 +169,16 @@ codegenExpression (S.Call name argExprs) = do
     _   -> do
       let function = AST.ConstantOperand $ AST.C.GlobalReference double (AST.Name name)
       call function args
+codegenExpression (S.Do statements) = do
+  results <- mapM codegenStatement statements
+  return $ head results
+
+codegenStatement :: S.Statement -> State Function AST.Operand
+codegenStatement (S.Expr expression) = codegenExpression expression
+codegenStatement (S.Let name expression) = do
+  result <- codegenExpression expression
+  modify $ \s -> s { symbols = Map.insert name result (symbols s) }
+  return result
 
 fadd :: AST.Operand -> AST.Operand -> State Function AST.Operand
 fadd a b = addNamedInstruction $ AST.FAdd AST.NoFastMathFlags a b []
