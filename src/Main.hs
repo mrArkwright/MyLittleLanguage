@@ -10,7 +10,6 @@ import Text.Parsec.String (parseFromFile)
 
 import qualified LLVM.General.AST as AST
 
-
 import Parser (myLittleLanguageParser)
 import Codegen
 import Compile
@@ -76,8 +75,4 @@ process astModule source = do
       mapM_ (putStrLn . (++ "\n") . show) definitions
 
       return $ Just $ codegen astModule definitions
-
-
-initModule :: String -> AST.Module
-initModule name = AST.defaultModule { AST.moduleName = name }
 

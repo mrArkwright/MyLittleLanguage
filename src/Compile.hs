@@ -2,7 +2,8 @@ module Compile where
 
 import Control.Monad.Except
 import qualified Data.ByteString as B
---import System.Cmd
+import Paths_MyLittleLanguage
+import System.Process
 
 import LLVM.General.Module
 import LLVM.General.Context
@@ -29,7 +30,12 @@ compile astModule = withContext $ \context -> do
       result <- runExceptT $ moduleObject targetMachine llvmModule
       case result of
         Left error  -> putStrLn error
-        Right bytes -> B.writeFile (moduleName ++ ".o") bytes
+        Right bytes -> do
+          let objectFileName = moduleName ++ ".o"
+          B.writeFile objectFileName bytes
+          builtinsPath <- getDataFileName "rts/builtins.c"
+          callProcess "clang" [builtinsPath, "-c", "-o", "builtins.o"]
+          callProcess "ld" ["-demangle", "-dynamic", "-arch", "x86_64", "-macosx_version_min", "10.11.0", "-lSystem", "/usr/local/lib/clang/3.9.1/lib/darwin/libclang_rt.osx.a", objectFileName, "builtins.o", "-o", "main"]
 
     case result of
       Left error -> putStrLn error

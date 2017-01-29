@@ -12,6 +12,7 @@ category:            Web
 build-type:          Simple
 cabal-version:       >=1.10
 extra-source-files:  README.md
+data-files:          rts/builtins.c
 
 executable MyLittleLanguage
   hs-source-dirs:      src
@@ -21,9 +22,10 @@ executable MyLittleLanguage
                      , mtl
                      , bytestring
                      , containers
+                     , process
                      , haskeline
                      , parsec
                      , llvm-general-pure
                      , llvm-general
-  
-  other-modules:       Misc, Syntax, Lexer, Parser, Codegen, Compile
+
+  other-modules:       Misc, Syntax, Lexer, Parser, Builtins, Codegen, Compile

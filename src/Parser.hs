@@ -23,8 +23,7 @@ myLittleLanguageParser = do
 --------------------------------------------------------------------------------
 
 definition :: Parser Def
-definition = try extern
-         <|> try function
+definition = try function
 
 function :: Parser Def
 function = do
@@ -33,13 +32,6 @@ function = do
   args <- L.parens $ many L.identifier
   body <- expr
   return $ Function name args body
-
-extern :: Parser Def
-extern = do
-  L.reserved "extern"
-  name <- L.identifier
-  args <- L.parens $ many L.identifier
-  return $ Extern name args
 
 
 

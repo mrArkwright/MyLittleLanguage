@@ -16,6 +16,7 @@ import qualified LLVM.General.AST.CallingConvention as AST
 import LLVM.General.AST.Instruction ( Named( (:=) ) )
 
 import Misc
+import Builtins
 import qualified Syntax as S
 
 
@@ -24,17 +25,20 @@ import qualified Syntax as S
 -- Modules
 --------------------------------------------------------------------------------
 
+initModule :: String -> AST.Module
+initModule name = 
+  let codegenBuiltin (Builtin name args) = addGlobalFunction name args [] in
+  let addBuiltins = execState (mapM codegenBuiltin builtins) in
+  addBuiltins $ AST.defaultModule { AST.moduleName = name }
+
 codegen :: AST.Module -> [S.Def] -> AST.Module
 codegen astModule definitions =
-  let moduleState = mapM codegenDefinition definitions in
-  execState moduleState astModule
+  execState (mapM codegenDefinition definitions) astModule
 
 codegenDefinition :: S.Def -> State AST.Module ()
 codegenDefinition (S.Function name argNames body) = do
   let basicBlocks = codegenFunction argNames body
   addGlobalFunction name argNames basicBlocks
-codegenDefinition (S.Extern name argNames) = do
-  addGlobalFunction name argNames []
 
 addGlobalFunction :: String -> [String] -> [AST.BasicBlock] -> State AST.Module ()
 addGlobalFunction name argNames basicBlocks = do
