@@ -35,7 +35,7 @@ compile astModule = withContext $ \context -> do
           B.writeFile objectFileName bytes
           builtinsPath <- getDataFileName "rts/builtins.c"
           callProcess "clang" [builtinsPath, "-c", "-o", "builtins.o"]
-          callProcess "ld" ["-demangle", "-dynamic", "-arch", "x86_64", "-macosx_version_min", "10.11.0", "-lSystem", "/usr/local/lib/clang/3.9.1/lib/darwin/libclang_rt.osx.a", objectFileName, "builtins.o", "-o", "main"]
+          callProcess "ld" ["-demangle", "-dynamic", "-arch", "x86_64", "-macosx_version_min", "10.13.0", "-lSystem", "/usr/local/opt/llvm@3.9/lib/clang/3.9.1/lib/darwin/libclang_rt.osx.a", objectFileName, "builtins.o", "-o", "main"]
 
     case result of
       Left error -> putStrLn error

@@ -39,7 +39,9 @@ lexer = Tok.makeTokenParser langDef where
   ops = ["+", "-", "*", "/", "<", "="]
   names = ["def", "do", "end", "let", "=", "if", "then", "else"]
   langDef = emptyDef {
-    Tok.commentLine = "#",
+    Tok.commentLine = "//",
+    Tok.commentStart = "/*",
+    Tok.commentEnd = "*/",
     Tok.reservedOpNames = ops,
     Tok.reservedNames = names
   }

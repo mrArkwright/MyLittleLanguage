@@ -130,6 +130,7 @@ makeUniqueLabel label = do
 --------------------------------------------------------------------------------
 
 codegenExpression :: S.Expr -> State Function AST.Operand
+codegenExpression (S.Int value) = return $ AST.ConstantOperand $ AST.C.Int 64 value
 codegenExpression (S.Float value) = return $ AST.ConstantOperand $ AST.C.Float (AST.Double value)
 codegenExpression (S.Var name) = do
   reference <- getLocalReference name
@@ -255,6 +256,9 @@ getLocalReference :: String -> State Function (Maybe AST.Operand)
 getLocalReference name = do
   symbols' <- gets symbols
   return $ Map.lookup name symbols'
+
+integer :: AST.Type
+integer = AST.IntegerType 64
 
 double :: AST.Type
 double = AST.FloatingPointType 64 AST.IEEE

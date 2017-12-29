@@ -44,6 +44,7 @@ expr = buildExpressionParser opTable factor
 
 factor :: Parser Expr
 factor = try float
+     <|> try integer
      <|> try call
      <|> variable
      <|> ifThenElse
@@ -55,6 +56,11 @@ binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call s [x, y])) assoc
 opTable = [[binary "*" AssocLeft, binary "/" AssocLeft],
          [binary "+" AssocLeft, binary "-" AssocLeft],
          [binary "<" AssocLeft]]
+
+integer :: Parser Expr
+integer = do
+  value <- L.integer
+  return $ Int value
 
 float :: Parser Expr
 float = do
