@@ -8,7 +8,7 @@ import System.Console.Haskeline
 import Text.Parsec (parse)
 import Text.Parsec.String (parseFromFile)
 
-import qualified LLVM.General.AST as AST
+import qualified LLVM.AST as AST
 
 import Parser (myLittleLanguageParser)
 import Codegen

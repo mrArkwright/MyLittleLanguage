@@ -1,5 +1,6 @@
 module Syntax where
 
+
 type Name = String
 
 data Type

@@ -25,7 +25,7 @@ executable MyLittleLanguage
                      , process
                      , haskeline
                      , parsec
-                     , llvm-general-pure
-                     , llvm-general
+                     , llvm-hs-pure
+                     , llvm-hs
 
   other-modules:       Misc, Syntax, Lexer, Parser, Builtins, Codegen, Compile

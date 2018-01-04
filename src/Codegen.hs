@@ -6,14 +6,16 @@ import Data.Maybe
 import Data.Function
 import Control.Monad.State
 import qualified Data.Map as Map
+import qualified Data.ByteString.Short as B (toShort, fromShort)
+import qualified Data.ByteString.Char8 as BC
 
-import qualified LLVM.General.AST as AST
-import qualified LLVM.General.AST.Global as AST
-import qualified LLVM.General.AST.Constant as AST.C
-import qualified LLVM.General.AST.Float as AST
-import qualified LLVM.General.AST.FloatingPointPredicate as AST
-import qualified LLVM.General.AST.CallingConvention as AST
-import LLVM.General.AST.Instruction ( Named( (:=) ) )
+import qualified LLVM.AST as AST
+import qualified LLVM.AST.Global as AST
+import qualified LLVM.AST.Constant as AST.C
+import qualified LLVM.AST.Float as AST
+import qualified LLVM.AST.FloatingPointPredicate as AST
+import qualified LLVM.AST.CallingConvention as AST
+import LLVM.AST.Instruction ( Named( (:=) ) )
 
 import Misc
 import Builtins
@@ -29,7 +31,7 @@ initModule :: String -> AST.Module
 initModule name = 
   let codegenBuiltin (Builtin name args) = addGlobalFunction name args [] in
   let addBuiltins = execState (mapM codegenBuiltin builtins) in
-  addBuiltins $ AST.defaultModule { AST.moduleName = name }
+  addBuiltins $ AST.defaultModule { AST.moduleName = B.toShort $ BC.pack name }
 
 codegen :: AST.Module -> [S.Def] -> AST.Module
 codegen astModule definitions =
@@ -42,9 +44,9 @@ codegenDefinition (S.Function name argNames body) = do
 
 addGlobalFunction :: String -> [String] -> [AST.BasicBlock] -> State AST.Module ()
 addGlobalFunction name argNames basicBlocks = do
-  let args = map (\argName -> AST.Parameter double (AST.Name argName) []) argNames
+  let args = map (\argName -> AST.Parameter double (AST.Name argName) []) (map (B.toShort . BC.pack) argNames)
   let def = AST.GlobalDefinition $ AST.functionDefaults {
-    AST.name        = AST.Name name,
+    AST.name        = AST.Name (B.toShort $ BC.pack name),
     AST.parameters  = (args, False),
     AST.returnType  = double,
     AST.basicBlocks = basicBlocks
@@ -104,7 +106,7 @@ codegenFunction argNames body = (flip evalState) emptyFunction $ do
 basicBlockToLLVMBasicBlock :: BasicBlock -> AST.BasicBlock
 basicBlockToLLVMBasicBlock (BasicBlock name' instructions' terminator') =
   let terminator'' = maybeError terminator' ("Block has no terminator: " ++ (show name')) in
-  AST.BasicBlock (AST.Name name') instructions' terminator''
+  AST.BasicBlock (AST.Name $ B.toShort $ BC.pack name') instructions' terminator''
 
 newBasicBlock :: String -> State Function ()
 newBasicBlock name = do
@@ -172,7 +174,7 @@ codegenExpression (S.Call name argExprs) = do
       let (a:b:_) = args
       fcmp AST.ULT a b
     _   -> do
-      let function = AST.ConstantOperand $ AST.C.GlobalReference double (AST.Name name)
+      let function = AST.ConstantOperand $ AST.C.GlobalReference double (AST.Name $ B.toShort $ BC.pack name)
       call function args
 codegenExpression (S.Do statements) = do
   results <- mapM codegenStatement statements
@@ -204,17 +206,17 @@ call :: AST.Operand -> [AST.Operand] -> State Function AST.Operand
 call fn args = addNamedInstruction $ AST.Call Nothing AST.C [] (Right fn) [(arg, []) | arg <- args] [] []
 
 br :: String -> State Function ()
-br label = addTerminator $ AST.Do $ AST.Br (AST.Name label) []
+br label = addTerminator $ AST.Do $ AST.Br (AST.Name $ B.toShort $ BC.pack label) []
 
 condBr :: AST.Operand -> String -> String -> State Function ()
 condBr condition trueLabel falseLabel =
-  let trueLabel'  = AST.Name trueLabel  in
-  let falseLabel' = AST.Name falseLabel in
+  let trueLabel'  = AST.Name $ B.toShort $ BC.pack trueLabel in
+  let falseLabel' = AST.Name $ B.toShort $ BC.pack falseLabel in
   addTerminator $ AST.Do $ AST.CondBr condition trueLabel' falseLabel' []
 
 phi :: [(AST.Operand, String)] -> State Function AST.Operand
 phi incoming =
-  let incoming' = map (\(operand, label) -> (operand, AST.Name label)) incoming in
+  let incoming' = map (\(operand, label) -> (operand, AST.Name $ B.toShort $ BC.pack label)) incoming in
   addNamedInstruction $ AST.Phi double incoming' []
 
 ret :: AST.Operand -> State Function ()
@@ -248,7 +250,7 @@ addTerminator trm = do
 
 addLocalReference :: String -> State Function AST.Operand
 addLocalReference name = do
-  let newSymbol = AST.LocalReference double (AST.Name name)
+  let newSymbol = AST.LocalReference double (AST.Name $ B.toShort $ BC.pack name)
   modify $ \s -> s { symbols = Map.insert name newSymbol (symbols s) }
   return newSymbol
 
@@ -261,5 +263,5 @@ integer :: AST.Type
 integer = AST.IntegerType 64
 
 double :: AST.Type
-double = AST.FloatingPointType 64 AST.IEEE
+double = AST.FloatingPointType AST.DoubleFP
 
