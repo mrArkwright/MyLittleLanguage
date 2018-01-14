@@ -22,8 +22,6 @@ def printDashs() do
   printChar(10.0)
 end
 
-
-
 def main() do
   let f = fib(30.0)
   let twopi = 2.0 * 3.14

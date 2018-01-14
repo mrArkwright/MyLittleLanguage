@@ -15,6 +15,7 @@ import qualified LLVM.AST.Constant as AST.C
 import qualified LLVM.AST.Float as AST
 import qualified LLVM.AST.FloatingPointPredicate as AST
 import qualified LLVM.AST.CallingConvention as AST
+import qualified LLVM.AST.Type as AST
 import LLVM.AST.Instruction ( Named( (:=) ) )
 
 import Misc
@@ -28,7 +29,7 @@ import qualified Syntax as S
 --------------------------------------------------------------------------------
 
 initModule :: String -> AST.Module
-initModule name = 
+initModule name =
   let codegenBuiltin (Builtin name args) = addGlobalFunction name args [] in
   let addBuiltins = execState (mapM codegenBuiltin builtins) in
   addBuiltins $ AST.defaultModule { AST.moduleName = B.toShort $ BC.pack name }
@@ -174,7 +175,8 @@ codegenExpression (S.Call name argExprs) = do
       let (a:b:_) = args
       fcmp AST.ULT a b
     _   -> do
-      let function = AST.ConstantOperand $ AST.C.GlobalReference double (AST.Name $ B.toShort $ BC.pack name)
+      let functionType = AST.ptr $ AST.FunctionType double (replicate (length args) double) False
+      let function = AST.ConstantOperand $ AST.C.GlobalReference functionType (AST.Name $ B.toShort $ BC.pack name)
       call function args
 codegenExpression (S.Do statements) = do
   results <- mapM codegenStatement statements

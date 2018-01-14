@@ -28,4 +28,4 @@ executable MyLittleLanguage
                      , llvm-hs-pure
                      , llvm-hs
 
-  other-modules:       Misc, Syntax, Lexer, Parser, Builtins, Codegen, Compile
+  other-modules:       Paths_MyLittleLanguage, Misc, Syntax, Lexer, Parser, Builtins, Codegen, Compile

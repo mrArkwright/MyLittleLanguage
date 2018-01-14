@@ -30,5 +30,5 @@ compile astModule = withContext $ \context -> do
       B.writeFile objectFileName bytes
       builtinsPath <- getDataFileName "rts/builtins.c"
       callProcess "clang" [builtinsPath, "-c", "-o", "builtins.o"]
-      callProcess "ld" ["-demangle", "-dynamic", "-arch", "x86_64", "-macosx_version_min", "10.13.0", "-lSystem", "/usr/local/opt/llvm@4/lib/clang/4.0.1/lib/darwin/libclang_rt.osx.a", objectFileName, "builtins.o", "-o", "main"]
+      callProcess "ld" ["-demangle", "-dynamic", "-arch", "x86_64", "-macosx_version_min", "10.13.0", "-lSystem", "/usr/local/opt/llvm/lib/clang/5.0.1/lib/darwin/libclang_rt.osx.a", objectFileName, "builtins.o", "-o", "main"]
 
