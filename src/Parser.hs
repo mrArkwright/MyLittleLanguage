@@ -17,6 +17,29 @@ myLittleLanguageParser = do
   return definitions
 
 
+--------------------------------------------------------------------------------
+-- types
+--------------------------------------------------------------------------------
+
+parseType :: Parser Type
+parseType = parseUnitType
+  <|> parseIntType
+  <|> parseFloatType
+
+parseUnitType :: Parser Type
+parseUnitType = do
+  L.reserved "Unit"
+  return TypeUnit
+
+parseIntType :: Parser Type
+parseIntType = do
+  L.reserved "Int"
+  return TypeInt
+
+parseFloatType :: Parser Type
+parseFloatType = do
+  L.reserved "Float"
+  return TypeFloat
 
 --------------------------------------------------------------------------------
 -- definitions
@@ -29,9 +52,19 @@ function :: Parser Def
 function = do
   L.reserved "def"
   name <- L.identifier
-  args <- L.parens $ many L.identifier
+  args <- L.parens $ L.commaSep parseArg
+  L.reserved ":"
+  functionType <- parseType
+  L.reserved "="
   body <- expr
-  return $ Function name args body
+  return $ Function name functionType args body
+
+parseArg :: Parser (Name, Type)
+parseArg = do
+  argName <- L.identifier
+  L.reserved ":"
+  argType <- parseType
+  return (argName, argType)
 
 
 
@@ -43,19 +76,25 @@ expr :: Parser Expr
 expr = buildExpressionParser opTable factor
 
 factor :: Parser Expr
-factor = try float
-     <|> try integer
-     <|> try call
-     <|> variable
-     <|> ifThenElse
-     <|> doBlock
-     <|> L.parens expr
+factor = try parseUnit
+  <|> try float
+  <|> try integer
+  <|> try call
+  <|> variable
+  <|> ifThenElse
+  <|> doBlock
+  <|> L.parens expr
 
 binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call s [x, y])) assoc
 
 opTable = [[binary "*" AssocLeft, binary "/" AssocLeft],
          [binary "+" AssocLeft, binary "-" AssocLeft],
          [binary "<" AssocLeft]]
+
+parseUnit :: Parser Expr
+parseUnit = do
+  L.reserved "()"
+  return Unit
 
 integer :: Parser Expr
 integer = do
@@ -114,7 +153,9 @@ letStatement :: Parser Statement
 letStatement = do
   L.reserved "let"
   name <- L.identifier
+  L.reserved ":"
+  letType <- parseType
   L.reserved "="
   expression <- expr
-  return $ Let name expression
+  return $ Let name letType expression
 

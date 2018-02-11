@@ -39,7 +39,8 @@ codegen astModule definitions =
   execState (mapM codegenDefinition definitions) astModule
 
 codegenDefinition :: S.Def -> State AST.Module ()
-codegenDefinition (S.Function name argNames body) = do
+codegenDefinition (S.Function name _ args body) = do
+  let argNames = map fst args
   let basicBlocks = codegenFunction argNames body
   addGlobalFunction name argNames basicBlocks
 
@@ -133,6 +134,7 @@ makeUniqueLabel label = do
 --------------------------------------------------------------------------------
 
 codegenExpression :: S.Expr -> State Function AST.Operand
+codegenExpression S.Unit = return $ AST.ConstantOperand $ AST.C.Int 64 0 -- TODO remove dummy value for unit
 codegenExpression (S.Int value) = return $ AST.ConstantOperand $ AST.C.Int 64 value
 codegenExpression (S.Float value) = return $ AST.ConstantOperand $ AST.C.Float (AST.Double value)
 codegenExpression (S.Var name) = do
@@ -184,7 +186,7 @@ codegenExpression (S.Do statements) = do
 
 codegenStatement :: S.Statement -> State Function AST.Operand
 codegenStatement (S.Expr expression) = codegenExpression expression
-codegenStatement (S.Let name expression) = do
+codegenStatement (S.Let name _ expression) = do
   result <- codegenExpression expression
   modify $ \s -> s { symbols = Map.insert name result (symbols s) }
   return result

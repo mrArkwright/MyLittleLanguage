@@ -4,21 +4,22 @@ module Syntax where
 type Name = String
 
 data Type
-  = TypeInt | TypeFloat
+  = TypeUnit | TypeInt | TypeFloat
   deriving (Eq, Ord, Show)
 
 data Def
-  = Function Name [Name] Expr
+  = Function Name Type [(Name, Type)] Expr
   deriving (Eq, Ord, Show)
 
 data Statement
   = Expr Expr
-  | Let Name Expr
+  | Let Name Type Expr
   deriving (Eq, Ord, Show)
 
 data Expr
-  = Float Double
+  = Unit
   | Int Integer
+  | Float Double
   | Var Name
   | If Expr Expr Expr
   | Call Name [Expr]

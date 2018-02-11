@@ -1,31 +1,27 @@
 // MyLittleLanguage test program
 
-def fib(x)
-  if x < 3.0 then
-    1.0
-  else
-    fib(x-1.0) + fib(x-2.0)
+def fib(x: Float): Float = if x < 3.0 then 1.0 else fib(x-1.0) + fib(x-2.0)
 
-def printTimes(n x)
+def printTimes(n: Int, x: Int): Unit =
   if 1.0 < n then do
     printChar(x)
     printTimes(n - 1.0, x)
-  end else 0.0
+  end else ()
 
-def foo(i) do
+def foo(i: Int): Unit = do
   printInt(i)
   printChar(10.0)
 end
 
-def printDashs() do
+def printDashs(): Unit = do
   printTimes(80.0, 45.0)
   printChar(10.0)
 end
 
-def main() do
-  let f = fib(30.0)
-  let twopi = 2.0 * 3.14
-  let s = sin(1.0 / 3.0 * twopi)
+def main(): Unit = do
+  let f: Float = fib(30.0)
+  let twopi: Float = 2.0 * 3.14
+  let s: Float = sin(1.0 / 3.0 * twopi)
 
   printDashs()
 
