@@ -4,6 +4,7 @@ import Control.Monad.Trans
 import Data.List
 import System.Environment
 import System.Console.Haskeline
+import System.Console.Pretty
 
 import Text.Parsec (parse)
 import Text.Parsec.String (parseFromFile)
@@ -40,14 +41,18 @@ repl = do
 -- process file
 --------------------------------------------------------------------------------
 
-processFile :: String -> IO ()
+processFile :: String -> IO Bool
 processFile fileName = do
   source <- readFile fileName
   let moduleName = init $ dropWhileEnd (/= '.') $ fileName
   newModule <- process (initModule moduleName) source
   case newModule of
-    Nothing -> return ()
-    Just newModule -> compile newModule
+    Nothing -> do
+      putStrLn $ "[" ++ color Red "error" ++ "] "
+      return False
+    Just newModule' -> do
+      compile newModule'
+      return True
 
 
 

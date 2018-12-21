@@ -1,6 +1,4 @@
-.stack-work/
 .DS_Store
+.stack-work/
 *.cabal
-test/*.ll
-test/*.s
-test/*.o
+build/

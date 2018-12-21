@@ -11,5 +11,7 @@ main = do
   args <- getArgs
   case args of
     []           -> repl
-    (fileName:_) -> processFile fileName
+    (fileName : _) -> do
+      success <- processFile fileName
+      if (success) then exitSuccess else exitFailure
 

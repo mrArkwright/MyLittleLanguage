@@ -14,7 +14,9 @@ dependencies:
   - bytestring
   - containers
   - process
+  - directory
   - haskeline
+  - pretty-terminal
   - parsec
   - llvm-hs-pure
   - llvm-hs
@@ -28,4 +30,12 @@ executable:
   source-dirs: app
   dependencies:
     - MyLittleLanguage
+
+tests:
+  spec:
+    main: Spec.hs
+    source-dirs: test
+    dependencies:
+      - MyLittleLanguage
+      - hspec
 
