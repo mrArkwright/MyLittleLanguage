@@ -1,4 +1,4 @@
-module Main where
+module Top where
 
 import Control.Monad.Trans
 import Data.List
@@ -13,16 +13,6 @@ import qualified LLVM.AST as AST
 import Parser (myLittleLanguageParser)
 import Codegen
 import Compile
-
-
-
-main :: IO ()
-main = do
-  args <- getArgs
-  case args of
-    []           -> repl
-    (fileName:_) -> processFile fileName
-
 
 
 --------------------------------------------------------------------------------

@@ -1,0 +1,31 @@
+name: MyLittleLanguage
+version: 0.1.0.0
+maintainer: jnkthss.dev@icloud.com
+github: mrArkwright/MyLittleLanguage
+copyright: 2017 Jannik Theiß
+extra-source-files:
+  - README.md
+
+data-files: rts/builtins.c
+
+dependencies:
+  - base >= 4.7 && < 5
+  - mtl
+  - bytestring
+  - containers
+  - process
+  - haskeline
+  - parsec
+  - llvm-hs-pure
+  - llvm-hs
+
+library:
+  source-dirs: src
+  exposed-modules: Top
+
+executable:
+  main: Main.hs
+  source-dirs: app
+  dependencies:
+    - MyLittleLanguage
+
