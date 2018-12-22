@@ -7,11 +7,9 @@ import Control.Monad.Trans
 import System.Console.Haskeline
 import System.Console.Pretty
 
-import Text.Parsec (parse)
-
 import qualified LLVM.AST as AST
 
-import Parser (myLittleLanguageParser)
+import Parser
 import Codegen
 import Compile
 
@@ -62,7 +60,7 @@ processFile fileName = do
 
 process :: AST.Module -> String -> IO (Maybe AST.Module)
 process astModule source = do
-  let program = parse myLittleLanguageParser "<stdin>" source
+  let program = parse "<stdin>" source
   case program of
     Left  err         -> print err >> return Nothing
     Right definitions -> do

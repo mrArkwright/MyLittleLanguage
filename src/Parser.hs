@@ -2,13 +2,17 @@ module Parser where
 
 import Data.Functor.Identity
 
-import Text.Parsec
+import Text.Parsec hiding (parse)
+import qualified Text.Parsec as P (parse)
 import Text.Parsec.String (Parser)
 import Text.Parsec.Expr
 
 import qualified Lexer as L
 import Syntax
 
+
+parse :: String -> String -> Either ParseError [Def]
+parse name source = P.parse myLittleLanguageParser name source
 
 myLittleLanguageParser :: Parser [Def]
 myLittleLanguageParser = do
