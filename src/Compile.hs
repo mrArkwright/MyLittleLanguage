@@ -1,8 +1,7 @@
 module Compile where
 
-import Control.Monad.Except
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Short as B (toShort, fromShort)
+import qualified Data.ByteString.Short as B (fromShort)
 import qualified Data.ByteString.Char8 as BC
 
 import System.Process
@@ -11,7 +10,6 @@ import System.Directory
 import LLVM.Module
 import LLVM.Context
 import LLVM.Target
-import qualified LLVM as LLVM
 import qualified LLVM.AST as AST
 
 import Paths_MyLittleLanguage

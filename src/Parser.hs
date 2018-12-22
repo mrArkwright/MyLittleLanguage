@@ -1,9 +1,10 @@
 module Parser where
 
---import Debug.Trace
+import Data.Functor.Identity
+
 import Text.Parsec
 import Text.Parsec.String (Parser)
-import Text.Parsec.Expr (buildExpressionParser, Operator(Infix), Assoc(AssocLeft))
+import Text.Parsec.Expr
 
 import qualified Lexer as L
 import Syntax
@@ -85,8 +86,10 @@ factor = try parseUnit
   <|> doBlock
   <|> L.parens expr
 
+binary :: String -> Assoc -> Operator String () Identity Expr
 binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call s [x, y])) assoc
 
+opTable :: OperatorTable String () Identity Expr
 opTable = [[binary "*" AssocLeft, binary "/" AssocLeft],
          [binary "+" AssocLeft, binary "-" AssocLeft],
          [binary "<" AssocLeft]]

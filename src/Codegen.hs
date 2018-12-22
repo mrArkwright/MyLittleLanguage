@@ -1,13 +1,11 @@
 module Codegen where
 
 
-import Data.List
-import Data.Maybe
-import Data.Function
-import Control.Monad.State
 import qualified Data.Map as Map
-import qualified Data.ByteString.Short as B (toShort, fromShort)
+import qualified Data.ByteString.Short as B (toShort)
 import qualified Data.ByteString.Char8 as BC
+
+import Control.Monad.State
 
 import qualified LLVM.AST as AST
 import qualified LLVM.AST.Global as AST
@@ -30,7 +28,7 @@ import qualified Syntax as S
 
 initModule :: String -> AST.Module
 initModule name =
-  let codegenBuiltin (Builtin name args) = addGlobalFunction name args [] in
+  let codegenBuiltin (Builtin builtinName args) = addGlobalFunction builtinName args [] in
   let addBuiltins = execState (mapM codegenBuiltin builtins) in
   addBuiltins $ AST.defaultModule { AST.moduleName = B.toShort $ BC.pack name }
 
@@ -63,46 +61,46 @@ addGlobalFunction name argNames basicBlocks = do
 --------------------------------------------------------------------------------
 
 data Function = Function {
-  currentBasicBlock     :: BasicBlock,
-  basicBlocks           :: [BasicBlock],
-  symbols               :: Map.Map String AST.Operand,
-  namedInstructionCount :: Word,
-  labels                :: Map.Map String Int
+    _currentBasicBlock     :: BasicBlock,
+    _basicBlocks           :: [BasicBlock],
+    _symbols               :: Map.Map String AST.Operand,
+    _namedInstructionCount :: Word,
+    _labels                :: Map.Map String Int
   } deriving Show
 
 emptyFunction :: Function
 emptyFunction = Function {
-  currentBasicBlock     = emptyBasicBlock "entry",
-  basicBlocks           = [],
-  symbols               = Map.empty,
-  namedInstructionCount = 0,
-  labels                = Map.empty
+    _currentBasicBlock     = emptyBasicBlock "entry",
+    _basicBlocks           = [],
+    _symbols               = Map.empty,
+    _namedInstructionCount = 0,
+    _labels                = Map.empty
   }
 
 data BasicBlock = BasicBlock {
-  name         :: String,
-  instructions :: [AST.Named AST.Instruction],
-  terminator   :: Maybe (AST.Named AST.Terminator)
+    _name         :: String,
+    _instructions :: [AST.Named AST.Instruction],
+    _terminator   :: Maybe (AST.Named AST.Terminator)
   } deriving Show
 
 emptyBasicBlock :: String -> BasicBlock
 emptyBasicBlock name = BasicBlock {
-  name         =  name,
-  instructions = [],
-  terminator   = Nothing
+    _name         =  name,
+    _instructions = [],
+    _terminator   = Nothing
   }
 
 codegenFunction :: [String] -> S.Expr -> [AST.BasicBlock]
 codegenFunction argNames body = (flip evalState) emptyFunction $ do
-  args <- mapM addLocalReference argNames
+  _ <- mapM addLocalReference argNames
   result <- codegenExpression body
   ret result
 
-  basicBlocks' <- gets basicBlocks
-  currentBasicBlock' <- gets currentBasicBlock
-  modify $ \s -> s { basicBlocks = basicBlocks' ++ [currentBasicBlock'] }
+  basicBlocks' <- gets _basicBlocks
+  currentBasicBlock' <- gets _currentBasicBlock
+  modify $ \s -> s { _basicBlocks = basicBlocks' ++ [currentBasicBlock'] }
 
-  basicBlocks'' <- gets basicBlocks
+  basicBlocks'' <- gets _basicBlocks
   return $ map basicBlockToLLVMBasicBlock basicBlocks''
 
 basicBlockToLLVMBasicBlock :: BasicBlock -> AST.BasicBlock
@@ -112,20 +110,20 @@ basicBlockToLLVMBasicBlock (BasicBlock name' instructions' terminator') =
 
 newBasicBlock :: String -> State Function ()
 newBasicBlock name = do
-  basicBlocks' <- gets basicBlocks
-  currentBasicBlock' <- gets currentBasicBlock
-  modify $ \s -> s { basicBlocks = basicBlocks' ++ [currentBasicBlock'] }
-  modify $ \s -> s { currentBasicBlock = emptyBasicBlock name }
+  basicBlocks' <- gets _basicBlocks
+  currentBasicBlock' <- gets _currentBasicBlock
+  modify $ \s -> s { _basicBlocks = basicBlocks' ++ [currentBasicBlock'] }
+  modify $ \s -> s { _currentBasicBlock = emptyBasicBlock name }
 
 makeUniqueLabel :: String -> State Function String
 makeUniqueLabel label = do
-  labels' <- gets labels
+  labels' <- gets _labels
   case Map.lookup label labels' of
     Nothing    -> do
-      modify $ \s -> s { labels = Map.insert label 1 labels' }
+      modify $ \s -> s { _labels = Map.insert label 1 labels' }
       return label
     Just count -> do
-      modify $ \s -> s { labels = Map.insert label (count + 1) labels' }
+      modify $ \s -> s { _labels = Map.insert label (count + 1) labels' }
       return $ label ++ show count
 
 
@@ -188,7 +186,7 @@ codegenStatement :: S.Statement -> State Function AST.Operand
 codegenStatement (S.Expr expression) = codegenExpression expression
 codegenStatement (S.Let name _ expression) = do
   result <- codegenExpression expression
-  modify $ \s -> s { symbols = Map.insert name result (symbols s) }
+  modify $ \s -> s { _symbols = Map.insert name result (_symbols s) }
   return result
 
 fadd :: AST.Operand -> AST.Operand -> State Function AST.Operand
@@ -230,9 +228,9 @@ addNamedInstruction :: AST.Instruction -> State Function AST.Operand
 addNamedInstruction instruction = do
   n <- nextRegisterNumber
   let ref = (AST.UnName n)
-  currentBasicBlock' <- gets currentBasicBlock
-  let currentBasicBlock'' = currentBasicBlock' { instructions = instructions currentBasicBlock' ++ [ref := instruction] }
-  modify $ \s -> s { currentBasicBlock = currentBasicBlock'' }
+  currentBasicBlock' <- gets _currentBasicBlock
+  let currentBasicBlock'' = currentBasicBlock' { _instructions = _instructions currentBasicBlock' ++ [ref := instruction] }
+  modify $ \s -> s { _currentBasicBlock = currentBasicBlock'' }
   return $ AST.LocalReference double ref
 
 --addUnnamedInstruction :: AST.Instruction -> State Function ()
@@ -241,26 +239,26 @@ addNamedInstruction instruction = do
 
 nextRegisterNumber :: State Function Word
 nextRegisterNumber = do
-  n <- gets namedInstructionCount
+  n <- gets _namedInstructionCount
   let m = n + 1
-  modify $ \s -> s { namedInstructionCount = m }
+  modify $ \s -> s { _namedInstructionCount = m }
   return m
 
 addTerminator :: AST.Named AST.Terminator -> State Function ()
 addTerminator trm = do
-  currentBasicBlock' <- gets currentBasicBlock
-  let currentBasicBlock'' = currentBasicBlock' { terminator = Just trm }
-  modify $ \s -> s { currentBasicBlock = currentBasicBlock'' }
+  currentBasicBlock' <- gets _currentBasicBlock
+  let currentBasicBlock'' = currentBasicBlock' { _terminator = Just trm }
+  modify $ \s -> s { _currentBasicBlock = currentBasicBlock'' }
 
 addLocalReference :: String -> State Function AST.Operand
 addLocalReference name = do
   let newSymbol = AST.LocalReference double (AST.Name $ B.toShort $ BC.pack name)
-  modify $ \s -> s { symbols = Map.insert name newSymbol (symbols s) }
+  modify $ \s -> s { _symbols = Map.insert name newSymbol (_symbols s) }
   return newSymbol
 
 getLocalReference :: String -> State Function (Maybe AST.Operand)
 getLocalReference name = do
-  symbols' <- gets symbols
+  symbols' <- gets _symbols
   return $ Map.lookup name symbols'
 
 integer :: AST.Type

@@ -1,13 +1,13 @@
 module Top where
 
-import Control.Monad.Trans
 import Data.List
-import System.Environment
+
+import Control.Monad.Trans
+
 import System.Console.Haskeline
 import System.Console.Pretty
 
 import Text.Parsec (parse)
-import Text.Parsec.String (parseFromFile)
 
 import qualified LLVM.AST as AST
 
@@ -33,7 +33,7 @@ repl = do
           newModule <- liftIO $ process astModule input
           case newModule of
             Nothing        -> loop astModule
-            Just newModule -> loop newModule
+            Just newModule' -> loop newModule'
 
 
 
@@ -64,7 +64,7 @@ process :: AST.Module -> String -> IO (Maybe AST.Module)
 process astModule source = do
   let program = parse myLittleLanguageParser "<stdin>" source
   case program of
-    Left  error       -> print error >> return Nothing
+    Left  err         -> print err >> return Nothing
     Right definitions -> do
       --putStrLn "---- Definitions ----"
       --mapM_ (putStrLn . (++ "\n") . show) definitions
