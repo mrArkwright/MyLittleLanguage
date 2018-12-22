@@ -1,4 +1,4 @@
-module Codegen where
+module Codegen (initModule, codegen) where
 
 
 import qualified Data.Map as Map
@@ -260,9 +260,6 @@ getLocalReference :: String -> State Function (Maybe AST.Operand)
 getLocalReference name = do
   symbols' <- gets _symbols
   return $ Map.lookup name symbols'
-
-integer :: AST.Type
-integer = AST.IntegerType 64
 
 double :: AST.Type
 double = AST.FloatingPointType AST.DoubleFP

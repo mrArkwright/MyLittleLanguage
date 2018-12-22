@@ -1,4 +1,4 @@
-module Parser where
+module Parser (parse) where
 
 import Data.Functor.Identity
 

@@ -1,4 +1,4 @@
-module Compile where
+module Compile (compile) where
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Short as B (fromShort)

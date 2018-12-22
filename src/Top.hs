@@ -1,4 +1,4 @@
-module Top where
+module Top (repl, processFile) where
 
 import Data.List
 
