@@ -6,7 +6,7 @@ double printInt(int i) {
     return 0.0;
 }
 
-double printDouble(double x) {
+double printFloat(double x) {
 	printf("%f", x);
 	return 0.0;
 }

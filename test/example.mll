@@ -25,10 +25,10 @@ def main(): Unit = do
 
   printDashs()
 
-  printDouble(f)
+  printFloat(f)
   printChar(10.0)
 
-  printDouble(sin(1.0 / 3.0 * twopi))
+  printFloat(sin(1.0 / 3.0 * twopi))
   printChar(10.0)
 
   foo(3)

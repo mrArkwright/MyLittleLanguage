@@ -8,7 +8,7 @@ builtins = [
     Builtin "exitSuccess" [],
     Builtin "printInt" ["i"],
     Builtin "printChar" ["c"],
-    Builtin "printDouble" ["d"],
+    Builtin "printFloat" ["d"],
     Builtin "sin" ["x"]
   ]
 
