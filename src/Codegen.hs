@@ -190,16 +190,16 @@ codegenStatement (S.Let name _ expression) = do
   return result
 
 fadd :: AST.Operand -> AST.Operand -> State Function AST.Operand
-fadd a b = addNamedInstruction $ AST.FAdd AST.NoFastMathFlags a b []
+fadd a b = addNamedInstruction $ AST.FAdd AST.noFastMathFlags a b []
 
 fsub :: AST.Operand -> AST.Operand -> State Function AST.Operand
-fsub a b = addNamedInstruction $ AST.FSub AST.NoFastMathFlags a b []
+fsub a b = addNamedInstruction $ AST.FSub AST.noFastMathFlags a b []
 
 fmul :: AST.Operand -> AST.Operand -> State Function AST.Operand
-fmul a b = addNamedInstruction $ AST.FMul AST.NoFastMathFlags a b []
+fmul a b = addNamedInstruction $ AST.FMul AST.noFastMathFlags a b []
 
 fdiv :: AST.Operand -> AST.Operand -> State Function AST.Operand
-fdiv a b = addNamedInstruction $ AST.FDiv AST.NoFastMathFlags a b []
+fdiv a b = addNamedInstruction $ AST.FDiv AST.noFastMathFlags a b []
 
 fcmp :: AST.FloatingPointPredicate -> AST.Operand -> AST.Operand -> State Function AST.Operand
 fcmp condition a b = addNamedInstruction $ AST.FCmp condition a b []
