@@ -8,21 +8,29 @@ data Type
   deriving (Eq, Ord, Show)
 
 data Def
-  = Function Name Type [(Name, Type)] Expr
+  = Function Loc Name Type [(Name, Type)] Expr
   deriving (Eq, Ord, Show)
 
 data Statement
-  = Expr Expr
-  | Let Name Type Expr
+  = Expr Loc Expr
+  | Let Loc Name Type Expr
   deriving (Eq, Ord, Show)
 
 data Expr
-  = Unit
-  | Int Integer
-  | Float Double
-  | Var Name
-  | If Expr Expr Expr
-  | Call Name [Expr]
-  | Do [Statement]
+  = Unit Loc
+  | Int Loc Integer
+  | Float Loc Double
+  | Var Loc Name
+  | If Loc Expr Expr Expr
+  | Call Loc Name [Expr]
+  | Do Loc [Statement]
   deriving (Eq, Ord, Show)
 
+data Loc = LineLocation Int
+  deriving (Eq, Ord, Show)
+
+locDescription :: Loc -> String
+locDescription (LineLocation i) = "line " ++ show i ++ ": "
+
+locFromDef :: Def -> Loc
+locFromDef (Function loc _ _ _ _) = loc

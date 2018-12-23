@@ -55,6 +55,7 @@ definition = try function
 
 function :: Parser Def
 function = do
+  loc <- LineLocation <$> sourceLine <$> getPosition
   L.reserved "def"
   name <- L.identifier
   args <- L.parens $ L.commaSep parseArg
@@ -62,7 +63,7 @@ function = do
   functionType <- parseType
   L.reserved "="
   body <- expr
-  return $ Function name functionType args body
+  return $ Function loc name functionType args body
 
 parseArg :: Parser (Name, Type)
 parseArg = do
@@ -91,7 +92,7 @@ factor = try parseUnit
   <|> L.parens expr
 
 binary :: String -> Assoc -> Operator String () Identity Expr
-binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call s [x, y])) assoc
+binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call (LineLocation 0) s [x, y])) assoc -- TODO location
 
 opTable :: OperatorTable String () Identity Expr
 opTable = [[binary "*" AssocLeft, binary "/" AssocLeft],
@@ -100,46 +101,53 @@ opTable = [[binary "*" AssocLeft, binary "/" AssocLeft],
 
 parseUnit :: Parser Expr
 parseUnit = do
+  loc <- LineLocation <$> sourceLine <$> getPosition
   L.reserved "()"
-  return Unit
+  return $ Unit loc
 
 integer :: Parser Expr
 integer = do
+  loc <- LineLocation <$> sourceLine <$> getPosition
   value <- L.integer
-  return $ Int value
+  return $ Int loc value
 
 float :: Parser Expr
 float = do
+  loc <- LineLocation <$> sourceLine <$> getPosition
   value <- L.float
-  return $ Float value
+  return $ Float loc value
 
 variable :: Parser Expr
 variable = do
+  loc <- LineLocation <$> sourceLine <$> getPosition
   name <- L.identifier
-  return $ Var name
+  return $ Var loc name
 
 ifThenElse :: Parser Expr
 ifThenElse = do
+  loc <- LineLocation <$> sourceLine <$> getPosition
   L.reserved "if"
   condition <- expr
   L.reserved "then"
   ifTrue <- expr
   L.reserved "else"
   ifFalse <- expr
-  return $ If condition ifTrue ifFalse
+  return $ If loc condition ifTrue ifFalse
 
 call :: Parser Expr
 call = do
+  loc <- LineLocation <$> sourceLine <$> getPosition
   name <- L.identifier
   args <- L.parens $ L.commaSep expr
-  return $ Call name args
+  return $ Call loc name args
 
 doBlock :: Parser Expr
 doBlock = do
+  loc <- LineLocation <$> sourceLine <$> getPosition
   L.reserved "do"
   statements <- many statement
   L.reserved "end"
-  return $ Do statements
+  return $ Do loc statements
 
 
 
@@ -153,16 +161,18 @@ statement = try expressionStatement
 
 expressionStatement :: Parser Statement
 expressionStatement = do
+  loc <- LineLocation <$> sourceLine <$> getPosition
   expression <- expr
-  return $ Expr expression
+  return $ Expr loc expression
 
 letStatement :: Parser Statement
 letStatement = do
+  loc <- LineLocation <$> sourceLine <$> getPosition
   L.reserved "let"
   name <- L.identifier
   L.reserved ":"
   letType <- parseType
   L.reserved "="
   expression <- expr
-  return $ Let name letType expression
+  return $ Let loc name letType expression
 

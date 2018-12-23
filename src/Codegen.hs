@@ -37,7 +37,7 @@ codegen astModule definitions =
   execState (mapM codegenDefinition definitions) astModule
 
 codegenDefinition :: S.Def -> State AST.Module ()
-codegenDefinition (S.Function name _ args body) = do
+codegenDefinition (S.Function _ name _ args body) = do
   let argNames = map fst args
   let basicBlocks = codegenFunction argNames body
   addGlobalFunction name argNames basicBlocks
@@ -132,13 +132,13 @@ makeUniqueLabel label = do
 --------------------------------------------------------------------------------
 
 codegenExpression :: S.Expr -> State Function AST.Operand
-codegenExpression S.Unit = return $ AST.ConstantOperand $ AST.C.Int 64 0 -- TODO remove dummy value for unit
-codegenExpression (S.Int value) = return $ AST.ConstantOperand $ AST.C.Int 64 value
-codegenExpression (S.Float value) = return $ AST.ConstantOperand $ AST.C.Float (AST.Double value)
-codegenExpression (S.Var name) = do
+codegenExpression (S.Unit _) = return $ AST.ConstantOperand $ AST.C.Int 64 0 -- TODO remove dummy value for unit
+codegenExpression (S.Int _ value) = return $ AST.ConstantOperand $ AST.C.Int 64 value
+codegenExpression (S.Float _ value) = return $ AST.ConstantOperand $ AST.C.Float (AST.Double value)
+codegenExpression (S.Var _ name) = do
   reference <- getLocalReference name
   return $ maybeError reference ("no such symbol: " ++ name)
-codegenExpression (S.If condition ifTrue ifFalse) = do
+codegenExpression (S.If _ condition ifTrue ifFalse) = do
   thenLabel <- makeUniqueLabel "if.then"
   elseLabel <- makeUniqueLabel "if.else"
   contLabel <- makeUniqueLabel "if.cont"
@@ -156,7 +156,7 @@ codegenExpression (S.If condition ifTrue ifFalse) = do
 
   newBasicBlock contLabel
   phi [(trueResult, thenLabel), (falseResult, elseLabel)]
-codegenExpression (S.Call name argExprs) = do
+codegenExpression (S.Call _ name argExprs) = do
   args <- mapM codegenExpression argExprs
   case name of
     "+" -> do
@@ -178,13 +178,13 @@ codegenExpression (S.Call name argExprs) = do
       let functionType = AST.ptr $ AST.FunctionType double (replicate (length args) double) False
       let function = AST.ConstantOperand $ AST.C.GlobalReference functionType (AST.Name $ B.toShort $ BC.pack name)
       call function args
-codegenExpression (S.Do statements) = do
+codegenExpression (S.Do _ statements) = do
   results <- mapM codegenStatement statements
   return $ head results
 
 codegenStatement :: S.Statement -> State Function AST.Operand
-codegenStatement (S.Expr expression) = codegenExpression expression
-codegenStatement (S.Let name _ expression) = do
+codegenStatement (S.Expr _ expression) = codegenExpression expression
+codegenStatement (S.Let _ name _ expression) = do
   result <- codegenExpression expression
   modify $ \s -> s { _symbols = Map.insert name result (_symbols s) }
   return result
