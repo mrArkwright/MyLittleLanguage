@@ -5,7 +5,10 @@ import qualified Data.Map as Map
 import qualified Data.ByteString.Short as B (toShort)
 import qualified Data.ByteString.Char8 as BC
 
+import Control.Monad.Reader
 import Control.Monad.State
+import Control.Monad.Except
+import Control.Monad.Morph
 
 import qualified LLVM.AST as AST
 import qualified LLVM.AST.Global as AST
@@ -26,23 +29,26 @@ import qualified Syntax as S
 -- Modules
 --------------------------------------------------------------------------------
 
+type Codegen = StateT AST.Module (Except Error)
+
 initModule :: String -> AST.Module
-initModule name =
-  let codegenBuiltin (Builtin builtinName args) = addGlobalFunction builtinName args [] in
-  let addBuiltins = execState (mapM codegenBuiltin builtins) in
-  addBuiltins $ AST.defaultModule { AST.moduleName = B.toShort $ BC.pack name }
+initModule name = AST.defaultModule {
+    AST.moduleName = B.toShort $ BC.pack name
+  }
 
-codegen :: AST.Module -> [S.Def] -> AST.Module
-codegen astModule definitions =
-  execState (mapM codegenDefinition definitions) astModule
+codegen :: Monad m => AST.Module -> [S.Def] -> ExceptT Error m AST.Module
+codegen astModule definitions = hoist generalize $ flip execStateT astModule $ do
+  let codegenBuiltin (Builtin builtinName args) = addGlobalFunction builtinName args []
+  mapM_ codegenBuiltin builtins
+  mapM_ codegenDefinition definitions
 
-codegenDefinition :: S.Def -> State AST.Module ()
+codegenDefinition :: S.Def -> Codegen ()
 codegenDefinition (S.Function _ name _ args body) = do
   let argNames = map fst args
-  let basicBlocks = codegenFunction argNames body
+  basicBlocks <- lift $ codegenFunction argNames body
   addGlobalFunction name argNames basicBlocks
 
-addGlobalFunction :: String -> [String] -> [AST.BasicBlock] -> State AST.Module ()
+addGlobalFunction :: String -> [String] -> [AST.BasicBlock] -> Codegen ()
 addGlobalFunction name argNames basicBlocks = do
   let args = map (\argName -> AST.Parameter double (AST.Name argName) []) (map (B.toShort . BC.pack) argNames)
   let def = AST.GlobalDefinition $ AST.functionDefaults {
@@ -90,9 +96,11 @@ emptyBasicBlock name = BasicBlock {
     _terminator   = Nothing
   }
 
-codegenFunction :: [String] -> S.Expr -> [AST.BasicBlock]
-codegenFunction argNames body = (flip evalState) emptyFunction $ do
-  _ <- mapM addLocalReference argNames
+type CodegenFunction = StateT Function (Except Error)
+
+codegenFunction :: [String] -> S.Expr -> Except Error [AST.BasicBlock]
+codegenFunction argNames body = (flip evalStateT) emptyFunction $ do
+  mapM_ addLocalReference argNames
   result <- codegenExpression body
   ret result
 
@@ -101,21 +109,21 @@ codegenFunction argNames body = (flip evalState) emptyFunction $ do
   modify $ \s -> s { _basicBlocks = basicBlocks' ++ [currentBasicBlock'] }
 
   basicBlocks'' <- gets _basicBlocks
-  return $ map basicBlockToLLVMBasicBlock basicBlocks''
+  mapM basicBlockToLLVMBasicBlock basicBlocks''
 
-basicBlockToLLVMBasicBlock :: BasicBlock -> AST.BasicBlock
-basicBlockToLLVMBasicBlock (BasicBlock name' instructions' terminator') =
-  let terminator'' = maybeError terminator' ("Block has no terminator: " ++ (show name')) in
-  AST.BasicBlock (AST.Name $ B.toShort $ BC.pack name') instructions' terminator''
+basicBlockToLLVMBasicBlock :: BasicBlock -> CodegenFunction AST.BasicBlock
+basicBlockToLLVMBasicBlock (BasicBlock name' instructions' terminator') = do
+  terminator'' <- maybeToExcept terminator' $ "Block has no terminator: " ++ (show name')
+  return $ AST.BasicBlock (AST.Name $ B.toShort $ BC.pack name') instructions' terminator''
 
-newBasicBlock :: String -> State Function ()
+newBasicBlock :: String -> CodegenFunction ()
 newBasicBlock name = do
   basicBlocks' <- gets _basicBlocks
   currentBasicBlock' <- gets _currentBasicBlock
   modify $ \s -> s { _basicBlocks = basicBlocks' ++ [currentBasicBlock'] }
   modify $ \s -> s { _currentBasicBlock = emptyBasicBlock name }
 
-makeUniqueLabel :: String -> State Function String
+makeUniqueLabel :: String -> CodegenFunction String
 makeUniqueLabel label = do
   labels' <- gets _labels
   case Map.lookup label labels' of
@@ -131,7 +139,7 @@ makeUniqueLabel label = do
 -- Instructions
 --------------------------------------------------------------------------------
 
-codegenExpression :: S.Expr -> State Function AST.Operand
+codegenExpression :: S.Expr -> CodegenFunction AST.Operand
 codegenExpression (S.Unit _) = return $ AST.ConstantOperand $ AST.C.Int 64 0 -- TODO remove dummy value for unit
 codegenExpression (S.Int _ value) = return $ AST.ConstantOperand $ AST.C.Int 64 value
 codegenExpression (S.Float _ value) = return $ AST.ConstantOperand $ AST.C.Float (AST.Double value)
@@ -182,49 +190,49 @@ codegenExpression (S.Do _ statements) = do
   results <- mapM codegenStatement statements
   return $ head results
 
-codegenStatement :: S.Statement -> State Function AST.Operand
+codegenStatement :: S.Statement -> CodegenFunction AST.Operand
 codegenStatement (S.Expr _ expression) = codegenExpression expression
 codegenStatement (S.Let _ name _ expression) = do
   result <- codegenExpression expression
   modify $ \s -> s { _symbols = Map.insert name result (_symbols s) }
   return result
 
-fadd :: AST.Operand -> AST.Operand -> State Function AST.Operand
+fadd :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
 fadd a b = addNamedInstruction $ AST.FAdd AST.noFastMathFlags a b []
 
-fsub :: AST.Operand -> AST.Operand -> State Function AST.Operand
+fsub :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
 fsub a b = addNamedInstruction $ AST.FSub AST.noFastMathFlags a b []
 
-fmul :: AST.Operand -> AST.Operand -> State Function AST.Operand
+fmul :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
 fmul a b = addNamedInstruction $ AST.FMul AST.noFastMathFlags a b []
 
-fdiv :: AST.Operand -> AST.Operand -> State Function AST.Operand
+fdiv :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
 fdiv a b = addNamedInstruction $ AST.FDiv AST.noFastMathFlags a b []
 
-fcmp :: AST.FloatingPointPredicate -> AST.Operand -> AST.Operand -> State Function AST.Operand
+fcmp :: AST.FloatingPointPredicate -> AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
 fcmp condition a b = addNamedInstruction $ AST.FCmp condition a b []
 
-call :: AST.Operand -> [AST.Operand] -> State Function AST.Operand
+call :: AST.Operand -> [AST.Operand] -> CodegenFunction AST.Operand
 call fn args = addNamedInstruction $ AST.Call Nothing AST.C [] (Right fn) [(arg, []) | arg <- args] [] []
 
-br :: String -> State Function ()
+br :: String -> CodegenFunction ()
 br label = addTerminator $ AST.Do $ AST.Br (AST.Name $ B.toShort $ BC.pack label) []
 
-condBr :: AST.Operand -> String -> String -> State Function ()
+condBr :: AST.Operand -> String -> String -> CodegenFunction ()
 condBr condition trueLabel falseLabel =
   let trueLabel'  = AST.Name $ B.toShort $ BC.pack trueLabel in
   let falseLabel' = AST.Name $ B.toShort $ BC.pack falseLabel in
   addTerminator $ AST.Do $ AST.CondBr condition trueLabel' falseLabel' []
 
-phi :: [(AST.Operand, String)] -> State Function AST.Operand
+phi :: [(AST.Operand, String)] -> CodegenFunction AST.Operand
 phi incoming =
   let incoming' = map (\(operand, label) -> (operand, AST.Name $ B.toShort $ BC.pack label)) incoming in
   addNamedInstruction $ AST.Phi double incoming' []
 
-ret :: AST.Operand -> State Function ()
+ret :: AST.Operand -> CodegenFunction ()
 ret val = addTerminator $ AST.Do $ AST.Ret (Just val) []
 
-addNamedInstruction :: AST.Instruction -> State Function AST.Operand
+addNamedInstruction :: AST.Instruction -> CodegenFunction AST.Operand
 addNamedInstruction instruction = do
   n <- nextRegisterNumber
   let ref = (AST.UnName n)
@@ -237,26 +245,26 @@ addNamedInstruction instruction = do
 --addUnnamedInstruction instruction = do
 --  modify $ \s -> s { instructions = instructions s ++ [AST.Do instruction] }
 
-nextRegisterNumber :: State Function Word
+nextRegisterNumber :: CodegenFunction Word
 nextRegisterNumber = do
   n <- gets _namedInstructionCount
   let m = n + 1
   modify $ \s -> s { _namedInstructionCount = m }
   return m
 
-addTerminator :: AST.Named AST.Terminator -> State Function ()
+addTerminator :: AST.Named AST.Terminator -> CodegenFunction ()
 addTerminator trm = do
   currentBasicBlock' <- gets _currentBasicBlock
   let currentBasicBlock'' = currentBasicBlock' { _terminator = Just trm }
   modify $ \s -> s { _currentBasicBlock = currentBasicBlock'' }
 
-addLocalReference :: String -> State Function AST.Operand
+addLocalReference :: String -> CodegenFunction AST.Operand
 addLocalReference name = do
   let newSymbol = AST.LocalReference double (AST.Name $ B.toShort $ BC.pack name)
   modify $ \s -> s { _symbols = Map.insert name newSymbol (_symbols s) }
   return newSymbol
 
-getLocalReference :: String -> State Function (Maybe AST.Operand)
+getLocalReference :: String -> CodegenFunction (Maybe AST.Operand)
 getLocalReference name = do
   symbols' <- gets _symbols
   return $ Map.lookup name symbols'

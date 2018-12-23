@@ -10,6 +10,7 @@ import System.Console.Pretty
 
 import qualified LLVM.AST as AST
 
+import Misc
 import Syntax
 import Parser
 import Codegen
@@ -33,10 +34,12 @@ repl = do
         Nothing    -> outputStrLn "Goodbye."
         Just ":q"  -> outputStrLn "Goodbye."
         Just input -> do
-          newModule <- liftIO $ process astModule input
+          newModule <- liftIO $ runExceptT $ process astModule input
           case newModule of
-            Nothing        -> loop astModule
-            Just newModule' -> loop newModule'
+            Left err -> do
+              liftIO $ print err
+              loop astModule
+            Right newModule' -> loop newModule'
 
 
 
@@ -48,12 +51,12 @@ processFile :: String -> IO Bool
 processFile fileName = do
   source <- readFile fileName
   let moduleName = init $ dropWhileEnd (/= '.') $ fileName
-  newModule <- process (initModule moduleName) source
+  newModule <- runExceptT $ process (initModule moduleName) source
   case newModule of
-    Nothing -> do
-      putStrLn $ "[" ++ color Red "error" ++ "] "
+    Left err -> do
+      putStrLn $ "[" ++ color Red "error" ++ "] " ++ err
       return False
-    Just newModule' -> do
+    Right newModule' -> do
       compile newModule'
       return True
 
@@ -63,14 +66,11 @@ processFile fileName = do
 -- common
 --------------------------------------------------------------------------------
 
-process :: AST.Module -> String -> IO (Maybe AST.Module)
+process :: AST.Module -> String -> ExceptT Error IO AST.Module
 process astModule source = do
-  let program = parse "<stdin>" source
-  case program of
-    Left  err         -> print err >> return Nothing
-    Right definitions -> do
-      when debug $ printDefinitions definitions
-      return $ Just $ codegen astModule definitions
+  definitions <- parse "<stdin>" source
+  when debug $ liftIO $ printDefinitions definitions
+  codegen astModule definitions
 
 printDefinitions :: [Def] -> IO ()
 printDefinitions definitions = do

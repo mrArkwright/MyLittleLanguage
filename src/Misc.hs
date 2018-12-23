@@ -1,8 +1,11 @@
 module Misc where
 
+import Control.Monad.Except
+
 import Data.Maybe
 
 
+type Error = String
 
 lastMaybe :: [a] -> Maybe a
 lastMaybe [] = Nothing
@@ -11,6 +14,10 @@ lastMaybe (_ : xs) = lastMaybe xs
 
 maybeError :: Maybe a -> String -> a
 maybeError value errorString = fromMaybe (error errorString) value
+
+maybeToExcept :: MonadError e m => Maybe a -> e -> m a
+maybeToExcept (Just x) _ = return x
+maybeToExcept Nothing err = throwError err
 
 buildFolder :: String
 buildFolder = "build"

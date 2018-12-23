@@ -1,5 +1,9 @@
 module Parser (parse) where
 
+import Control.Arrow (left)
+import Control.Monad.Except
+import Control.Monad.Morph
+
 import Data.Functor.Identity
 
 import Text.Parsec hiding (parse)
@@ -7,12 +11,13 @@ import qualified Text.Parsec as P (parse)
 import Text.Parsec.String (Parser)
 import Text.Parsec.Expr
 
+import Misc
 import qualified Lexer as L
 import Syntax
 
 
-parse :: String -> String -> Either ParseError [Def]
-parse name source = P.parse myLittleLanguageParser name source
+parse :: Monad m => String -> String -> ExceptT Error m [Def]
+parse name source = hoist generalize $ liftEither $ left show $ P.parse myLittleLanguageParser name source
 
 myLittleLanguageParser :: Parser [Def]
 myLittleLanguageParser = do
