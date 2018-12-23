@@ -1,14 +1,26 @@
 module Builtins where
 
+import Syntax
 
-data Builtin = Builtin String [String]
 
-builtins :: [Builtin]
+builtins :: [FuncDecl]
 builtins = [
-    Builtin "exitSuccess" [],
-    Builtin "printInt" ["i"],
-    Builtin "printChar" ["c"],
-    Builtin "printFloat" ["d"],
-    Builtin "sin" ["x"]
+    FuncDecl "+" (FuncSignature TypeInt [TypeInt, TypeInt]),
+    FuncDecl "-" (FuncSignature TypeInt [TypeInt, TypeInt]),
+    FuncDecl "<" (FuncSignature TypeBoolean [TypeInt, TypeInt]),
+    FuncDecl "+." (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
+    FuncDecl "-." (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
+    FuncDecl "*." (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
+    FuncDecl "/." (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
+    FuncDecl "<." (FuncSignature TypeBoolean [TypeFloat, TypeFloat])
+  ]
+
+libraryBuiltins :: [FuncDecl]
+libraryBuiltins = [
+    FuncDecl "exitSuccess" (FuncSignature TypeUnit []),
+    FuncDecl "printInt" (FuncSignature TypeUnit [TypeInt]),
+    FuncDecl "printChar" (FuncSignature TypeUnit [TypeInt]),
+    FuncDecl "printFloat" (FuncSignature TypeUnit [TypeFloat]),
+    FuncDecl "sin" (FuncSignature TypeFloat [TypeFloat])
   ]
 

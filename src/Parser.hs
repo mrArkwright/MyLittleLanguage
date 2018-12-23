@@ -100,9 +100,11 @@ binary :: String -> Assoc -> Operator String () Identity Expr
 binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call (LineLocation 0) s [x, y])) assoc -- TODO location
 
 opTable :: OperatorTable String () Identity Expr
-opTable = [[binary "*" AssocLeft, binary "/" AssocLeft],
-         [binary "+" AssocLeft, binary "-" AssocLeft],
-         [binary "<" AssocLeft]]
+opTable = [
+    [binary "*." AssocLeft, binary "/." AssocLeft],
+    [binary "+" AssocLeft, binary "-" AssocLeft, binary "+." AssocLeft, binary "-." AssocLeft],
+    [binary "<" AssocLeft, binary "<." AssocLeft]
+  ]
 
 parseUnit :: Parser Expr
 parseUnit = do

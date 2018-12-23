@@ -1,23 +1,19 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-double printInt(int i) {
+void printInt(int i) {
     printf("%d", i);
-    return 0.0;
 }
 
-double printFloat(double x) {
+void printFloat(double x) {
 	printf("%f", x);
-	return 0.0;
 }
 
-double printChar(double x) {
+void printChar(int x) {
 	printf("%c", (char)x);
-	return 0.0;
 }
 
-double exitSuccess() {
+void exitSuccess() {
 	exit(0);
-	return 0.0;
 }
 

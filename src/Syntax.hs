@@ -4,7 +4,19 @@ module Syntax where
 type Name = String
 
 data Type
-  = TypeUnit | TypeInt | TypeFloat
+  = TypeUnit | TypeBoolean | TypeInt | TypeFloat
+  deriving (Eq, Ord, Show)
+
+data VarDecl
+  = VarDecl Loc Name Type
+  deriving (Eq, Ord, Show)
+
+data FuncSignature
+  = FuncSignature Type [Type]
+  deriving (Eq, Ord, Show)
+
+data FuncDecl
+  = FuncDecl Name FuncSignature
   deriving (Eq, Ord, Show)
 
 data Def
@@ -34,3 +46,10 @@ locDescription (LineLocation i) = "line " ++ show i ++ ": "
 
 locFromDef :: Def -> Loc
 locFromDef (Function loc _ _ _ _) = loc
+
+defToFuncDecl :: Def -> FuncDecl
+defToFuncDecl (Function _ name fType params _) =
+  let params' = map (\(_, paramType) -> paramType) params in
+  let signature = FuncSignature fType params' in
+  FuncDecl name signature
+

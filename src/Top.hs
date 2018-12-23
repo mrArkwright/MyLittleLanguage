@@ -13,6 +13,7 @@ import qualified LLVM.AST as AST
 import Misc
 import Syntax
 import Parser
+import Typecheck
 import Codegen
 import Compile
 
@@ -70,6 +71,7 @@ process :: AST.Module -> String -> ExceptT Error IO AST.Module
 process astModule source = do
   definitions <- parse "<stdin>" source
   when debug $ liftIO $ printDefinitions definitions
+  typecheckProgram definitions
   codegen astModule definitions
 
 printDefinitions :: [Def] -> IO ()

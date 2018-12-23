@@ -1,66 +1,49 @@
 // MyLittleLanguage test program
 
-def fib(x: Float): Float = if x < 3.0 then 1.0 else fib(x-1.0) + fib(x-2.0)
-
-def printTimes(n: Int, x: Int): Unit =
-  if 1.0 < n then do
-    printChar(x)
-    printTimes(n - 1.0, x)
-  end else ()
-
-def foo(i: Int): Unit = do
-  printInt(i)
-  printChar(10.0)
-end
-
-def printDashs(): Unit = do
-  printTimes(80.0, 45.0)
-  printChar(10.0)
-end
-
 def main(): Unit = do
-  let f: Float = fib(30.0)
-  let twopi: Float = 2.0 * 3.14
-  let s: Float = sin(1.0 / 3.0 * twopi)
+  let pi: Float = 3.1415927
+  let tau: Float = 2.0 *. pi
+  let s: Float = sin(1.0 /. 3.0 *. tau)
 
   printDashs()
 
-  printFloat(f)
-  printChar(10.0)
+  let y: Float = foo(42.0 -. 2.0) +. foo(42.0 -. 1.0)
+  printFloatLine(y)
 
-  printFloat(sin(1.0 / 3.0 * twopi))
-  printChar(10.0)
+  let z: Float = 3.0 +. 4.5
+  printFloatLine(z)
 
-  foo(3)
+  printFloatLine(fib(30.0))
+  printFloatLine(s)
 
   printDashs()
 
   exitSuccess()
 end
 
-/*
+def fib(i: Float): Float = if i <. 3.0 then 1.0 else fib(i -. 1.0) +. fib(i -. 2.0)
 
-// code idea
+def foo(i: Float): Float = i +. 3.0
 
-let endline = '\n'
-
-let printEndline = print endline
-
-let main = do
-    let f = fib 30
-    let tau = 6.28
-    let s = sin (1.0 / 3.0 * tau)
-
-    for 1..80 $ print "-"
-    printEndline
-
-    printLine f
-    printLine s
-
-    for 1..80 do
-        print "-"
-    end
-    printEndline
+def printDashs(): Unit = do
+  let dash: Int = 45
+  printTimes(80, dash)
+  printNewline()
 end
 
-*/
+def printFloatLine(f: Float): Unit = do
+  printFloat(f)
+  printNewline()
+end
+
+def printTimes(n: Int, a: Int): Unit =
+  if 0 < n then do
+    printChar(a)
+    printTimes(n - 1, a)
+  end else ()
+
+def printNewline(): Unit = do
+  let newline: Int = 10
+  printChar(newline)
+end
+
