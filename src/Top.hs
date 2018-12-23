@@ -3,16 +3,21 @@ module Top (repl, processFile) where
 import Data.List
 
 import Control.Monad.Trans
+import Control.Monad.Except
 
 import System.Console.Haskeline
 import System.Console.Pretty
 
 import qualified LLVM.AST as AST
 
+import Syntax
 import Parser
 import Codegen
 import Compile
 
+
+debug :: Bool
+debug = True
 
 --------------------------------------------------------------------------------
 -- REPL
@@ -64,8 +69,11 @@ process astModule source = do
   case program of
     Left  err         -> print err >> return Nothing
     Right definitions -> do
-      --putStrLn "---- Definitions ----"
-      --mapM_ (putStrLn . (++ "\n") . show) definitions
-
+      when debug $ printDefinitions definitions
       return $ Just $ codegen astModule definitions
+
+printDefinitions :: [Def] -> IO ()
+printDefinitions definitions = do
+  putStrLn "---- Definitions ----"
+  mapM_ (putStrLn . (++ "\n") . show) definitions
 
