@@ -17,3 +17,7 @@ void exitSuccess() {
 	exit(0);
 }
 
+void exitFailure() {
+	exit(1);
+}
+

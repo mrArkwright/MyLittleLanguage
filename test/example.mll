@@ -15,6 +15,7 @@ def main(): Unit = do
 
   printFloatLine(fib(30.0))
   printFloatLine(s)
+  printFloatLine(sqrt(3.0) /. 2.0)
 
   printDashs()
 
