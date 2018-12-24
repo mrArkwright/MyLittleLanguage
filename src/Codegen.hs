@@ -34,9 +34,10 @@ type SymbolTable = M.Map S.Name S.FuncSignature
 
 type Codegen = StateT AST.Module (Except Error)
 
-initModule :: String -> AST.Module
-initModule name = AST.defaultModule {
-    AST.moduleName = B.toShort $ BC.pack name
+initModule :: String -> String -> AST.Module
+initModule name fileName = AST.defaultModule {
+    AST.moduleName = B.toShort $ BC.pack name,
+    AST.moduleSourceFileName = B.toShort $ BC.pack fileName
   }
 
 codegen :: Monad m => AST.Module -> [S.Def] -> ExceptT Error m AST.Module

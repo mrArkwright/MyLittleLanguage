@@ -28,14 +28,17 @@ debug = True
 repl :: IO ()
 repl = do
   putStrLn "---- MyLittleLanguage REPL ----"
-  runInputT defaultSettings (loop $ initModule "repl") where
+  let moduleName = "<stdin>"
+  let freshModule = initModule moduleName moduleName
+  runInputT defaultSettings $ loop freshModule where
     loop astModule = do
+      let moduleName = "<stdin>" -- TODO why is this necessary?
       minput <- getInputLine "➜ "
       case minput of
         Nothing    -> outputStrLn "Goodbye."
         Just ":q"  -> outputStrLn "Goodbye."
         Just input -> do
-          newModule <- liftIO $ runExceptT $ process astModule input
+          newModule <- liftIO $ runExceptT $ process moduleName astModule input
           case newModule of
             Left err -> do
               liftIO $ print err
@@ -52,7 +55,8 @@ processFile :: String -> IO Bool
 processFile fileName = do
   source <- readFile fileName
   let moduleName = init $ dropWhileEnd (/= '.') $ fileName
-  newModule <- runExceptT $ process (initModule moduleName) source
+  let freshModule = initModule moduleName fileName
+  newModule <- runExceptT $ process fileName freshModule source
   case newModule of
     Left err -> do
       putStrLn $ "[" ++ color Red "error" ++ "] " ++ err
@@ -67,9 +71,9 @@ processFile fileName = do
 -- common
 --------------------------------------------------------------------------------
 
-process :: AST.Module -> String -> ExceptT Error IO AST.Module
-process astModule source = do
-  definitions <- parse "<stdin>" source
+process :: String -> AST.Module -> String -> ExceptT Error IO AST.Module
+process name astModule source = do
+  definitions <- parse name source
   when debug $ liftIO $ printDefinitions definitions
   typecheckProgram definitions
   codegen astModule definitions
