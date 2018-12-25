@@ -52,7 +52,7 @@ codegenDeclaration (S.FuncDecl funcName (S.FuncSignature returnType args)) = add
   namedArgs = map (\(arg, i) -> ("x" ++ show i, arg)) $ zip args [(1 :: Int)..]
 
 codegenDefinition :: SymbolTable -> S.Def -> Codegen ()
-codegenDefinition symbolTable (S.Function _ name returnType args body) = do
+codegenDefinition symbolTable (S.Function name returnType args body _) = do
   let argNames = map fst args
   basicBlocks <- lift $ codegenFunction symbolTable argNames body
   addGlobalFunction name returnType args basicBlocks
@@ -155,12 +155,12 @@ makeUniqueLabel label = do
 
 codegenExpression :: S.Expr -> CodegenFunction (Maybe AST.Operand)
 codegenExpression (S.Unit _) = return Nothing
-codegenExpression (S.Int _ value) = return $ Just $ AST.ConstantOperand $ AST.C.Int 32 value
-codegenExpression (S.Float _ value) = return $ Just $ AST.ConstantOperand $ AST.C.Float (AST.Double value)
-codegenExpression (S.Var _ name) = do
+codegenExpression (S.Int value _) = return $ Just $ AST.ConstantOperand $ AST.C.Int 32 value
+codegenExpression (S.Float value _) = return $ Just $ AST.ConstantOperand $ AST.C.Float (AST.Double value)
+codegenExpression (S.Var name _) = do
   reference <- getLocalReference name
   return $ Just $ maybeError reference ("no such symbol: " ++ name)
-codegenExpression (S.If _ condition ifTrue ifFalse) = do
+codegenExpression (S.If condition ifTrue ifFalse _) = do
   thenLabel <- makeUniqueLabel "if.then"
   elseLabel <- makeUniqueLabel "if.else"
   contLabel <- makeUniqueLabel "if.cont"
@@ -183,7 +183,7 @@ codegenExpression (S.If _ condition ifTrue ifFalse) = do
       return $ Just ret
     (Nothing, Nothing) -> return Nothing
     _ -> throwError "error" -- TODO proper error message
-codegenExpression (S.Call _ name argExprs) = do
+codegenExpression (S.Call name argExprs _) = do
   args <- map fromJust <$> mapM codegenExpression argExprs
   case name of
     "+" -> do
@@ -216,13 +216,13 @@ codegenExpression (S.Call _ name argExprs) = do
       let functionType = AST.ptr $ AST.FunctionType (typeToType returnType) (map typeToType argTypes) False
       let function = AST.ConstantOperand $ AST.C.GlobalReference functionType (AST.Name $ B.toShort $ BC.pack name)
       call (returnType /= S.TypeUnit) function args
-codegenExpression (S.Do _ statements) = do
+codegenExpression (S.Do statements _) = do
   results <- mapM codegenStatement statements
   return $ last results
 
 codegenStatement :: S.Statement -> CodegenFunction (Maybe AST.Operand)
-codegenStatement (S.Expr _ expression) = codegenExpression expression
-codegenStatement (S.Let _ name _ expression) = do
+codegenStatement (S.Expr expression _) = codegenExpression expression
+codegenStatement (S.Let name _ expression _) = do
   result <- fromJust <$> codegenExpression expression
   modify $ \s -> s { _symbols = M.insert name result (_symbols s) }
   return Nothing

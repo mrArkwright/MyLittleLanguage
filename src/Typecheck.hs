@@ -37,38 +37,38 @@ typecheckProgram definitions = hoist generalize $ do
   flip runReaderT symbolTable $ mapM_ (flip evalStateT emptyContext . typecheckDef) definitions
 
 typecheckDef :: Def -> Typecheck ()
-typecheckDef (Function loc name defType params expr) = do
-  let params' = map (\(paramName, paramType) -> VarDecl loc paramName paramType) params
+typecheckDef (Function name defType params expr loc) = do
+  let params' = map (\(paramName, paramType) -> VarDecl paramName paramType loc) params
   mapM_ addVariable params'
   exprType <- typecheckExpr expr
   when (defType /= exprType) $ throwError $ locDescription loc ++ "definition of \"" ++ name ++ "\": expected " ++ show defType ++ " but got " ++ show exprType
 
 typecheckStatement :: Statement -> Typecheck Type
-typecheckStatement (Expr _ expr) =
+typecheckStatement (Expr expr _) =
   typecheckExpr expr
-typecheckStatement (Let loc name letType expr) = do
+typecheckStatement (Let name letType expr loc) = do
   exprType <- typecheckExpr expr
   when (letType /= exprType) $ throwError $ locDescription loc ++ "definition of \"" ++ name ++ "\": expected " ++ show letType ++ " but got " ++ show exprType
-  addVariable $ VarDecl loc name letType
+  addVariable $ VarDecl name letType loc
   return TypeUnit
 
 typecheckExpr :: Expr -> Typecheck Type
 typecheckExpr (Unit _) = return TypeUnit
 typecheckExpr (Int _ _) = return TypeInt
 typecheckExpr (Float _ _) = return TypeFloat
-typecheckExpr (Var loc name) = do
+typecheckExpr (Var name loc) = do
   variable <- findVariable name
   case variable of
     Just variableType -> return variableType
     Nothing -> throwError $ locDescription loc ++ "variable \"" ++ name ++ "\" not found"
-typecheckExpr (If loc conditionExpr trueExpr falseExpr) = do
+typecheckExpr (If conditionExpr trueExpr falseExpr loc) = do
   conditionExprType <- typecheckExpr conditionExpr
   when (conditionExprType /= TypeBoolean) $ throwError $ locDescription loc ++ "condition expression must be of type " ++ show TypeBoolean ++ " but has type " ++ show conditionExprType
   trueExprType <- typecheckExpr trueExpr
   falseExprType <- typecheckExpr falseExpr
   when (trueExprType /= falseExprType) $ throwError $ locDescription loc ++ "types of if branches differ: " ++ show trueExprType ++ " and " ++ show falseExprType
   return trueExprType
-typecheckExpr (Call loc cName exprs) = do
+typecheckExpr (Call cName exprs loc) = do
   declaration <- findDefinition cName
   FuncSignature calleeType calleeParameters <- case declaration of
     Just signature -> return signature
@@ -79,7 +79,7 @@ typecheckExpr (Call loc cName exprs) = do
     where
       typecheckParameter :: (Type, Type) -> Typecheck ()
       typecheckParameter (parameterType, exprType) = when (parameterType /= exprType) $ throwError $ locDescription loc ++ "function call: expected " ++ show parameterType ++ " but got " ++ show exprType
-typecheckExpr (Do loc statements) = do
+typecheckExpr (Do statements loc) = do
   statementTypes <- mapM typecheckStatement statements
   case lastMaybe statementTypes of
    Just lastStatementType -> return lastStatementType
@@ -100,7 +100,7 @@ getVariables :: Typecheck (M.Map Name Type)
 getVariables = gets contextVariables
 
 addVariable :: VarDecl -> Typecheck ()
-addVariable (VarDecl loc variableName variableType) = do
+addVariable (VarDecl variableName variableType loc) = do
   variables <- getVariables
   when (M.member variableName variables) $ throwError $ locDescription loc ++ "variable redefined: " ++ variableName
   modify $ \context -> context { contextVariables = M.insert variableName variableType variables }

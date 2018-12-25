@@ -68,7 +68,7 @@ function = do
   functionType <- parseType
   L.reserved "="
   body <- expr
-  return $ Function loc name functionType args body
+  return $ Function name functionType args body loc
 
 parseArg :: Parser (Name, Type)
 parseArg = do
@@ -97,7 +97,7 @@ factor = try parseUnit
   <|> L.parens expr
 
 binary :: String -> Assoc -> Operator String () Identity Expr
-binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call (LineLocation 0) s [x, y])) assoc -- TODO location
+binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call s [x, y] (LineLocation 0))) assoc -- TODO location
 
 opTable :: OperatorTable String () Identity Expr
 opTable = [
@@ -116,19 +116,19 @@ integer :: Parser Expr
 integer = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   value <- L.integer
-  return $ Int loc value
+  return $ Int value loc
 
 float :: Parser Expr
 float = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   value <- L.float
-  return $ Float loc value
+  return $ Float value loc
 
 variable :: Parser Expr
 variable = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   name <- L.identifier
-  return $ Var loc name
+  return $ Var name loc
 
 ifThenElse :: Parser Expr
 ifThenElse = do
@@ -139,14 +139,14 @@ ifThenElse = do
   ifTrue <- expr
   L.reserved "else"
   ifFalse <- expr
-  return $ If loc condition ifTrue ifFalse
+  return $ If condition ifTrue ifFalse loc
 
 call :: Parser Expr
 call = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   name <- L.identifier
   args <- L.parens $ L.commaSep expr
-  return $ Call loc name args
+  return $ Call name args loc
 
 doBlock :: Parser Expr
 doBlock = do
@@ -154,7 +154,7 @@ doBlock = do
   L.reserved "do"
   statements <- many statement
   L.reserved "end"
-  return $ Do loc statements
+  return $ Do statements loc
 
 
 
@@ -170,7 +170,7 @@ expressionStatement :: Parser Statement
 expressionStatement = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   expression <- expr
-  return $ Expr loc expression
+  return $ Expr expression loc
 
 letStatement :: Parser Statement
 letStatement = do
@@ -181,5 +181,5 @@ letStatement = do
   letType <- parseType
   L.reserved "="
   expression <- expr
-  return $ Let loc name letType expression
+  return $ Let name letType expression loc
 
