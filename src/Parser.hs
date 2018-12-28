@@ -10,6 +10,7 @@ import Text.Parsec hiding (parse)
 import qualified Text.Parsec as P (parse)
 import Text.Parsec.String (Parser)
 import Text.Parsec.Expr
+import Text.Parsec.Error
 
 import Misc
 import qualified Lexer as L
@@ -17,7 +18,13 @@ import Syntax
 
 
 parse :: Monad m => String -> String -> ExceptT Error m [Def ()]
-parse name source = hoist generalize $ liftEither $ left (\e -> (show e, Nothing)) $ P.parse myLittleLanguageParser name source -- TODO extract error line
+parse name source = hoist generalize $ liftEither $ left parseErrorToError $ P.parse myLittleLanguageParser name source -- TODO extract error line
+
+parseErrorToError :: ParseError -> Error
+parseErrorToError parseError =
+  let loc = LineLocation $ sourceLine $ errorPos parseError in
+  let errorMessage = showErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input" (errorMessages parseError) in
+  (errorMessage, Just loc)
 
 myLittleLanguageParser :: Parser [Def ()]
 myLittleLanguageParser = do
