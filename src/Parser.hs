@@ -17,7 +17,7 @@ import Syntax
 
 
 parse :: Monad m => String -> String -> ExceptT Error m [Def ()]
-parse name source = hoist generalize $ liftEither $ left show $ P.parse myLittleLanguageParser name source
+parse name source = hoist generalize $ liftEither $ left (\e -> (show e, Nothing)) $ P.parse myLittleLanguageParser name source -- TODO extract error line
 
 myLittleLanguageParser :: Parser [Def ()]
 myLittleLanguageParser = do

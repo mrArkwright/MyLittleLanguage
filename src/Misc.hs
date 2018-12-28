@@ -5,7 +5,11 @@ import Control.Monad.Except
 import Data.Maybe
 
 
-type Error = String
+
+data Loc = LineLocation Int
+  deriving (Eq, Ord, Show)
+
+type Error = (String, Maybe Loc)
 
 lastMaybe :: [a] -> Maybe a
 lastMaybe [] = Nothing
@@ -24,4 +28,7 @@ buildFolder = "build"
 
 inBuildFolder :: String -> String
 inBuildFolder path = buildFolder ++ "/" ++ path
+
+locDescription :: Loc -> String
+locDescription (LineLocation i) = "line " ++ show i ++ ": "
 

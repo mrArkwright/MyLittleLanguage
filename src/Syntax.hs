@@ -1,5 +1,7 @@
 module Syntax where
 
+import Misc
+
 
 type Name = String
 
@@ -37,12 +39,6 @@ data Expr tag
   | Call Name [(Expr tag)] tag Loc
   | Do [Statement tag] tag Loc
   deriving (Eq, Ord, Show)
-
-data Loc = LineLocation Int
-  deriving (Eq, Ord, Show)
-
-locDescription :: Loc -> String
-locDescription (LineLocation i) = "line " ++ show i ++ ": "
 
 locFromDef :: Def tag -> Loc
 locFromDef (Function _ _ _ _ loc) = loc

@@ -1,5 +1,6 @@
 module Top (repl, processFile) where
 
+import Data.Maybe
 import Data.List
 
 import Control.Monad.Trans
@@ -58,8 +59,9 @@ processFile fileName = do
   let freshModule = initModule moduleName fileName
   newModule <- runExceptT $ process fileName freshModule source
   case newModule of
-    Left err -> do
-      putStrLn $ "[" ++ color Red "error" ++ "] " ++ err
+    Left (err, loc) -> do
+      let locString = fromMaybe "" $ fmap locDescription loc
+      putStrLn $ "[" ++ color Red "error" ++ "] " ++ locString ++ err
       return False
     Right newModule' -> do
       compile newModule'

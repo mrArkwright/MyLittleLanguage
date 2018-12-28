@@ -120,7 +120,7 @@ codegenFunction symbolTable args body = (flip evalStateT) emptyFunction $ (flip 
 
 basicBlockToLLVMBasicBlock :: BasicBlock -> CodegenFunction AST.BasicBlock
 basicBlockToLLVMBasicBlock (BasicBlock name' instructions' terminator') = do
-  terminator'' <- maybeToExcept terminator' $ "Block has no terminator: " ++ (show name')
+  terminator'' <- maybeToExcept terminator' ("Block has no terminator: " ++ (show name'), Nothing)
   return $ AST.BasicBlock (AST.Name $ B.toShort $ BC.pack name') instructions' terminator''
 
 newBasicBlock :: String -> CodegenFunction ()
@@ -153,7 +153,7 @@ codegenExpression (S.Float value _ _) = return $ Just $ AST.ConstantOperand $ AS
 codegenExpression (S.Var name _ _) = do
   reference <- getLocalReference name
   return $ Just $ maybeError reference ("no such symbol: " ++ name)
-codegenExpression (S.If condition ifTrue ifFalse ifType _) = do
+codegenExpression (S.If condition ifTrue ifFalse ifType loc) = do
   thenLabel <- makeUniqueLabel "if.then"
   elseLabel <- makeUniqueLabel "if.else"
   contLabel <- makeUniqueLabel "if.cont"
@@ -175,7 +175,7 @@ codegenExpression (S.If condition ifTrue ifFalse ifType _) = do
       ret <- phi (typeToType ifType) [(trueResult', thenLabel), (falseResult', elseLabel)]
       return $ Just ret
     (Nothing, Nothing) -> return Nothing
-    _ -> throwError "error" -- TODO proper error message
+    _ -> throwError ("error", Just loc) -- TODO proper error message
 codegenExpression (S.Call name argExprs _ _) = do
   args <- map fromJust <$> mapM codegenExpression argExprs
   case name of
