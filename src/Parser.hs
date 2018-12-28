@@ -22,7 +22,7 @@ parse name source = hoist generalize $ liftEither $ left parseErrorToError $ P.p
 
 parseErrorToError :: ParseError -> Error
 parseErrorToError parseError =
-  let loc = LineLocation $ sourceLine $ errorPos parseError in
+  let loc = sourcePosToLoc $ errorPos parseError in
   let errorMessage = showErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input" (errorMessages parseError) in
   (errorMessage, Just loc)
 
@@ -67,7 +67,7 @@ definition = try function
 
 function :: Parser (Def ())
 function = do
-  loc <- LineLocation <$> sourceLine <$> getPosition
+  loc <- sourcePosToLoc <$> getPosition
   L.reserved "def"
   name <- L.identifier
   args <- L.parens $ L.commaSep parseArg
@@ -104,7 +104,12 @@ factor = try parseUnit
   <|> L.parens expr
 
 binary :: String -> Assoc -> Operator String () Identity (Expr ())
-binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call s [x, y] () (LineLocation 0))) assoc -- TODO location
+binary s assoc = Infix (binaryParser s) assoc
+
+binaryParser :: String -> Parser (Expr () -> Expr () -> Expr ())
+binaryParser s = do
+  loc <- sourcePosToLoc <$> getPosition
+  L.reservedOp s >> return (\x y -> Call s [x, y] () loc)
 
 opTable :: OperatorTable String () Identity (Expr ())
 opTable = [
@@ -115,31 +120,31 @@ opTable = [
 
 parseUnit :: Parser (Expr ())
 parseUnit = do
-  loc <- LineLocation <$> sourceLine <$> getPosition
+  loc <- sourcePosToLoc <$> getPosition
   L.reserved "()"
   return $ Unit () loc
 
 integer :: Parser (Expr ())
 integer = do
-  loc <- LineLocation <$> sourceLine <$> getPosition
+  loc <- sourcePosToLoc <$> getPosition
   value <- L.integer
   return $ Int value () loc
 
 float :: Parser (Expr ())
 float = do
-  loc <- LineLocation <$> sourceLine <$> getPosition
+  loc <- sourcePosToLoc <$> getPosition
   value <- L.float
   return $ Float value () loc
 
 variable :: Parser (Expr ())
 variable = do
-  loc <- LineLocation <$> sourceLine <$> getPosition
+  loc <- sourcePosToLoc <$> getPosition
   name <- L.identifier
   return $ Var name () loc
 
 ifThenElse :: Parser (Expr ())
 ifThenElse = do
-  loc <- LineLocation <$> sourceLine <$> getPosition
+  loc <- sourcePosToLoc <$> getPosition
   L.reserved "if"
   condition <- expr
   L.reserved "then"
@@ -150,14 +155,14 @@ ifThenElse = do
 
 call :: Parser (Expr ())
 call = do
-  loc <- LineLocation <$> sourceLine <$> getPosition
+  loc <- sourcePosToLoc <$> getPosition
   name <- L.identifier
   args <- L.parens $ L.commaSep expr
   return $ Call name args () loc
 
 doBlock :: Parser (Expr ())
 doBlock = do
-  loc <- LineLocation <$> sourceLine <$> getPosition
+  loc <- sourcePosToLoc <$> getPosition
   L.reserved "do"
   statements <- many statement
   L.reserved "end"
@@ -175,13 +180,13 @@ statement = try expressionStatement
 
 expressionStatement :: Parser (Statement ())
 expressionStatement = do
-  loc <- LineLocation <$> sourceLine <$> getPosition
+  loc <- sourcePosToLoc <$> getPosition
   expression <- expr
   return $ Expr expression () loc
 
 letStatement :: Parser (Statement ())
 letStatement = do
-  loc <- LineLocation <$> sourceLine <$> getPosition
+  loc <- sourcePosToLoc <$> getPosition
   L.reserved "let"
   name <- L.identifier
   L.reserved ":"
@@ -189,4 +194,12 @@ letStatement = do
   L.reserved "="
   expression <- expr
   return $ Let name letType expression () loc
+
+
+--------------------------------------------------------------------------------
+-- misc
+--------------------------------------------------------------------------------
+
+sourcePosToLoc :: SourcePos -> Loc
+sourcePosToLoc sourcePos = FileLineLocation (sourceName sourcePos) (sourceLine sourcePos)
 

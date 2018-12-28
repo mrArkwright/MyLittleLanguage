@@ -6,7 +6,7 @@ import Data.Maybe
 
 
 
-data Loc = LineLocation Int
+data Loc = FileLineLocation String Int
   deriving (Eq, Ord, Show)
 
 type Error = (String, Maybe Loc)
@@ -30,5 +30,5 @@ inBuildFolder :: String -> String
 inBuildFolder path = buildFolder ++ "/" ++ path
 
 locDescription :: Loc -> String
-locDescription (LineLocation i) = "line " ++ show i ++ ": "
+locDescription (FileLineLocation sourceName lineNumber) = sourceName ++ ", line " ++ show lineNumber ++ ": "
 
