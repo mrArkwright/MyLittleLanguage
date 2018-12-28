@@ -16,10 +16,10 @@ import qualified Lexer as L
 import Syntax
 
 
-parse :: Monad m => String -> String -> ExceptT Error m [Def]
+parse :: Monad m => String -> String -> ExceptT Error m [Def ()]
 parse name source = hoist generalize $ liftEither $ left show $ P.parse myLittleLanguageParser name source
 
-myLittleLanguageParser :: Parser [Def]
+myLittleLanguageParser :: Parser [Def ()]
 myLittleLanguageParser = do
   L.whiteSpace
   definitions <- many definition
@@ -55,10 +55,10 @@ parseFloatType = do
 -- definitions
 --------------------------------------------------------------------------------
 
-definition :: Parser Def
+definition :: Parser (Def ())
 definition = try function
 
-function :: Parser Def
+function :: Parser (Def ())
 function = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   L.reserved "def"
@@ -83,10 +83,10 @@ parseArg = do
 -- expressions
 --------------------------------------------------------------------------------
 
-expr :: Parser Expr
+expr :: Parser (Expr ())
 expr = buildExpressionParser opTable factor
 
-factor :: Parser Expr
+factor :: Parser (Expr ())
 factor = try parseUnit
   <|> try float
   <|> try integer
@@ -96,41 +96,41 @@ factor = try parseUnit
   <|> doBlock
   <|> L.parens expr
 
-binary :: String -> Assoc -> Operator String () Identity Expr
-binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call s [x, y] (LineLocation 0))) assoc -- TODO location
+binary :: String -> Assoc -> Operator String () Identity (Expr ())
+binary s assoc = Infix (L.reservedOp s >> return (\x y -> Call s [x, y] () (LineLocation 0))) assoc -- TODO location
 
-opTable :: OperatorTable String () Identity Expr
+opTable :: OperatorTable String () Identity (Expr ())
 opTable = [
     [binary "*." AssocLeft, binary "/." AssocLeft],
     [binary "+" AssocLeft, binary "-" AssocLeft, binary "+." AssocLeft, binary "-." AssocLeft],
     [binary "<" AssocLeft, binary "<." AssocLeft]
   ]
 
-parseUnit :: Parser Expr
+parseUnit :: Parser (Expr ())
 parseUnit = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   L.reserved "()"
-  return $ Unit loc
+  return $ Unit () loc
 
-integer :: Parser Expr
+integer :: Parser (Expr ())
 integer = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   value <- L.integer
-  return $ Int value loc
+  return $ Int value () loc
 
-float :: Parser Expr
+float :: Parser (Expr ())
 float = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   value <- L.float
-  return $ Float value loc
+  return $ Float value () loc
 
-variable :: Parser Expr
+variable :: Parser (Expr ())
 variable = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   name <- L.identifier
-  return $ Var name loc
+  return $ Var name () loc
 
-ifThenElse :: Parser Expr
+ifThenElse :: Parser (Expr ())
 ifThenElse = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   L.reserved "if"
@@ -139,22 +139,22 @@ ifThenElse = do
   ifTrue <- expr
   L.reserved "else"
   ifFalse <- expr
-  return $ If condition ifTrue ifFalse loc
+  return $ If condition ifTrue ifFalse () loc
 
-call :: Parser Expr
+call :: Parser (Expr ())
 call = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   name <- L.identifier
   args <- L.parens $ L.commaSep expr
-  return $ Call name args loc
+  return $ Call name args () loc
 
-doBlock :: Parser Expr
+doBlock :: Parser (Expr ())
 doBlock = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   L.reserved "do"
   statements <- many statement
   L.reserved "end"
-  return $ Do statements loc
+  return $ Do statements () loc
 
 
 
@@ -162,17 +162,17 @@ doBlock = do
 -- statements
 --------------------------------------------------------------------------------
 
-statement :: Parser Statement
+statement :: Parser (Statement ())
 statement = try expressionStatement
         <|> letStatement
 
-expressionStatement :: Parser Statement
+expressionStatement :: Parser (Statement ())
 expressionStatement = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   expression <- expr
-  return $ Expr expression loc
+  return $ Expr expression () loc
 
-letStatement :: Parser Statement
+letStatement :: Parser (Statement ())
 letStatement = do
   loc <- LineLocation <$> sourceLine <$> getPosition
   L.reserved "let"
@@ -181,5 +181,5 @@ letStatement = do
   letType <- parseType
   L.reserved "="
   expression <- expr
-  return $ Let name letType expression loc
+  return $ Let name letType expression () loc
 

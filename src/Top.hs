@@ -75,10 +75,10 @@ process :: String -> AST.Module -> String -> ExceptT Error IO AST.Module
 process name astModule source = do
   definitions <- parse name source
   when debug $ liftIO $ printDefinitions definitions
-  typecheckProgram definitions
-  codegen astModule definitions
+  typedDefinitions <- typecheckProgram definitions
+  codegen astModule typedDefinitions
 
-printDefinitions :: [Def] -> IO ()
+printDefinitions :: Show a => [Def a] -> IO ()
 printDefinitions definitions = do
   putStrLn "---- Definitions ----"
   mapM_ (putStrLn . (++ "\n") . show) definitions

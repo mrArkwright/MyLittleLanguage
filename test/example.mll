@@ -17,6 +17,11 @@ def main(): Unit = do
   printFloatLine(s)
   printFloatLine(sqrt(3.0) /. 2.0)
 
+  let foo: Int = if (1 < 2) then 42 else 100
+  let bar: Int = foo + 4
+  printInt(bar)
+  printNewline()
+
   printDashs()
 
   exitSuccess()

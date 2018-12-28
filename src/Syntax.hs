@@ -19,23 +19,23 @@ data FuncDecl
   = FuncDecl Name FuncSignature
   deriving (Eq, Ord, Show)
 
-data Def
-  = Function Name Type [(Name, Type)] Expr Loc
+data Def tag
+  = Function Name Type [(Name, Type)] (Expr tag) Loc
   deriving (Eq, Ord, Show)
 
-data Statement
-  = Expr Expr Loc
-  | Let Name Type Expr Loc
+data Statement tag
+  = Expr (Expr tag) tag Loc
+  | Let Name Type (Expr tag) tag Loc
   deriving (Eq, Ord, Show)
 
-data Expr
-  = Unit Loc
-  | Int Integer Loc
-  | Float Double Loc
-  | Var Name Loc
-  | If Expr Expr Expr Loc
-  | Call Name [Expr] Loc
-  | Do [Statement] Loc
+data Expr tag
+  = Unit tag Loc
+  | Int Integer tag Loc
+  | Float Double tag Loc
+  | Var Name tag Loc
+  | If (Expr tag) (Expr tag) (Expr tag) tag Loc
+  | Call Name [(Expr tag)] tag Loc
+  | Do [Statement tag] tag Loc
   deriving (Eq, Ord, Show)
 
 data Loc = LineLocation Int
@@ -44,10 +44,10 @@ data Loc = LineLocation Int
 locDescription :: Loc -> String
 locDescription (LineLocation i) = "line " ++ show i ++ ": "
 
-locFromDef :: Def -> Loc
+locFromDef :: Def tag -> Loc
 locFromDef (Function _ _ _ _ loc) = loc
 
-defToFuncDecl :: Def -> FuncDecl
+defToFuncDecl :: Def tag -> FuncDecl
 defToFuncDecl (Function name fType params _ _) =
   let params' = map (\(_, paramType) -> paramType) params in
   let signature = FuncSignature fType params' in

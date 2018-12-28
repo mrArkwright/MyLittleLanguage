@@ -40,7 +40,7 @@ initModule name fileName = AST.defaultModule {
     AST.moduleSourceFileName = B.toShort $ BC.pack fileName
   }
 
-codegen :: Monad m => AST.Module -> [S.Def] -> ExceptT Error m AST.Module
+codegen :: Monad m => AST.Module -> [(S.Def S.Type)] -> ExceptT Error m AST.Module
 codegen astModule definitions = hoist generalize $ flip execStateT astModule $ do
   let functionDeclarations = builtins ++ libraryBuiltins ++ map S.defToFuncDecl definitions
   let symbolTable = M.fromList $ map (\(S.FuncDecl name signature) -> (name, signature)) functionDeclarations
@@ -51,10 +51,9 @@ codegenDeclaration :: S.FuncDecl -> Codegen ()
 codegenDeclaration (S.FuncDecl funcName (S.FuncSignature returnType args)) = addGlobalFunction funcName returnType namedArgs [] where
   namedArgs = map (\(arg, i) -> ("x" ++ show i, arg)) $ zip args [(1 :: Int)..]
 
-codegenDefinition :: SymbolTable -> S.Def -> Codegen ()
+codegenDefinition :: SymbolTable -> S.Def S.Type -> Codegen ()
 codegenDefinition symbolTable (S.Function name returnType args body _) = do
-  let argNames = map fst args
-  basicBlocks <- lift $ codegenFunction symbolTable argNames body
+  basicBlocks <- lift $ codegenFunction symbolTable args body
   addGlobalFunction name returnType args basicBlocks
 
 addGlobalFunction :: String -> S.Type -> [(S.Name, S.Type)] -> [AST.BasicBlock] -> Codegen ()
@@ -68,12 +67,6 @@ addGlobalFunction name returnType args basicBlocks = do
   }
   defs <- gets AST.moduleDefinitions
   modify $ \s -> s { AST.moduleDefinitions = defs ++ [def] }
-
-typeToType :: S.Type -> AST.Type
-typeToType S.TypeUnit = AST.VoidType
-typeToType S.TypeFloat = double
-typeToType S.TypeInt = integer
-typeToType t = error $ "type not implemented: " ++ show t
 
 
 --------------------------------------------------------------------------------
@@ -112,9 +105,9 @@ emptyBasicBlock name = BasicBlock {
 
 type CodegenFunction = ReaderT SymbolTable (StateT Function (Except Error))
 
-codegenFunction :: SymbolTable -> [String] -> S.Expr -> Except Error [AST.BasicBlock]
-codegenFunction symbolTable argNames body = (flip evalStateT) emptyFunction $ (flip runReaderT) symbolTable $ do
-  mapM_ addLocalReference argNames
+codegenFunction :: SymbolTable -> [(S.Name, S.Type)] -> S.Expr S.Type -> Except Error [AST.BasicBlock]
+codegenFunction symbolTable args body = (flip evalStateT) emptyFunction $ (flip runReaderT) symbolTable $ do
+  mapM_ addLocalReference args
   result <- codegenExpression body
   returnValue result
 
@@ -153,14 +146,14 @@ makeUniqueLabel label = do
 -- Instructions
 --------------------------------------------------------------------------------
 
-codegenExpression :: S.Expr -> CodegenFunction (Maybe AST.Operand)
-codegenExpression (S.Unit _) = return Nothing
-codegenExpression (S.Int value _) = return $ Just $ AST.ConstantOperand $ AST.C.Int 32 value
-codegenExpression (S.Float value _) = return $ Just $ AST.ConstantOperand $ AST.C.Float (AST.Double value)
-codegenExpression (S.Var name _) = do
+codegenExpression :: S.Expr S.Type -> CodegenFunction (Maybe AST.Operand)
+codegenExpression (S.Unit _ _) = return Nothing
+codegenExpression (S.Int value _ _) = return $ Just $ AST.ConstantOperand $ AST.C.Int 32 value
+codegenExpression (S.Float value _ _) = return $ Just $ AST.ConstantOperand $ AST.C.Float (AST.Double value)
+codegenExpression (S.Var name _ _) = do
   reference <- getLocalReference name
   return $ Just $ maybeError reference ("no such symbol: " ++ name)
-codegenExpression (S.If condition ifTrue ifFalse _) = do
+codegenExpression (S.If condition ifTrue ifFalse ifType _) = do
   thenLabel <- makeUniqueLabel "if.then"
   elseLabel <- makeUniqueLabel "if.else"
   contLabel <- makeUniqueLabel "if.cont"
@@ -179,11 +172,11 @@ codegenExpression (S.If condition ifTrue ifFalse _) = do
   newBasicBlock contLabel
   case (trueResult, falseResult) of
     (Just trueResult', Just falseResult') -> do
-      ret <- phi [(trueResult', thenLabel), (falseResult', elseLabel)]
+      ret <- phi (typeToType ifType) [(trueResult', thenLabel), (falseResult', elseLabel)]
       return $ Just ret
     (Nothing, Nothing) -> return Nothing
     _ -> throwError "error" -- TODO proper error message
-codegenExpression (S.Call name argExprs _) = do
+codegenExpression (S.Call name argExprs _ _) = do
   args <- map fromJust <$> mapM codegenExpression argExprs
   case name of
     "+" -> do
@@ -215,46 +208,46 @@ codegenExpression (S.Call name argExprs _) = do
       let S.FuncSignature returnType argTypes = fromJust $ M.lookup name symbolTable
       let functionType = AST.ptr $ AST.FunctionType (typeToType returnType) (map typeToType argTypes) False
       let function = AST.ConstantOperand $ AST.C.GlobalReference functionType (AST.Name $ B.toShort $ BC.pack name)
-      call (returnType /= S.TypeUnit) function args
-codegenExpression (S.Do statements _) = do
+      call (returnType /= S.TypeUnit) (typeToType returnType) function args
+codegenExpression (S.Do statements _ _) = do
   results <- mapM codegenStatement statements
   return $ last results
 
-codegenStatement :: S.Statement -> CodegenFunction (Maybe AST.Operand)
-codegenStatement (S.Expr expression _) = codegenExpression expression
-codegenStatement (S.Let name _ expression _) = do
+codegenStatement :: S.Statement S.Type -> CodegenFunction (Maybe AST.Operand)
+codegenStatement (S.Expr expression _ _) = codegenExpression expression
+codegenStatement (S.Let name _ expression _ _) = do
   result <- fromJust <$> codegenExpression expression
   modify $ \s -> s { _symbols = M.insert name result (_symbols s) }
   return Nothing
 
 add :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
-add a b = addNamedInstruction $ AST.Add False False a b []
+add a b = addNamedInstruction integer $ AST.Add False False a b []
 
 sub :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
-sub a b = addNamedInstruction $ AST.Sub False False a b []
+sub a b = addNamedInstruction integer $ AST.Sub False False a b []
 
 icmp :: IPred.IntegerPredicate -> AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
-icmp condition a b = addNamedInstruction $ AST.ICmp condition a b []
+icmp condition a b = addNamedInstruction integer $ AST.ICmp condition a b []
 
 fadd :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
-fadd a b = addNamedInstruction $ AST.FAdd AST.noFastMathFlags a b []
+fadd a b = addNamedInstruction double $ AST.FAdd AST.noFastMathFlags a b []
 
 fsub :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
-fsub a b = addNamedInstruction $ AST.FSub AST.noFastMathFlags a b []
+fsub a b = addNamedInstruction double $ AST.FSub AST.noFastMathFlags a b []
 
 fmul :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
-fmul a b = addNamedInstruction $ AST.FMul AST.noFastMathFlags a b []
+fmul a b = addNamedInstruction double $ AST.FMul AST.noFastMathFlags a b []
 
 fdiv :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
-fdiv a b = addNamedInstruction $ AST.FDiv AST.noFastMathFlags a b []
+fdiv a b = addNamedInstruction double $ AST.FDiv AST.noFastMathFlags a b []
 
 fcmp :: FPred.FloatingPointPredicate -> AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
-fcmp condition a b = addNamedInstruction $ AST.FCmp condition a b []
+fcmp condition a b = addNamedInstruction integer $ AST.FCmp condition a b []
 
-call :: Bool -> AST.Operand -> [AST.Operand] -> CodegenFunction (Maybe AST.Operand)
-call named fn args = do
+call :: Bool -> AST.Type -> AST.Operand -> [AST.Operand] -> CodegenFunction (Maybe AST.Operand)
+call named returnType fn args = do
   let callInstruction = AST.Call Nothing AST.C [] (Right fn) [(arg, []) | arg <- args] [] []
-  if named then Just <$> (addNamedInstruction callInstruction) else do
+  if named then Just <$> (addNamedInstruction returnType callInstruction) else do
     addUnnamedInstruction callInstruction
     return Nothing
 
@@ -267,22 +260,22 @@ condBr condition trueLabel falseLabel =
   let falseLabel' = AST.Name $ B.toShort $ BC.pack falseLabel in
   addTerminator $ AST.Do $ AST.CondBr condition trueLabel' falseLabel' []
 
-phi :: [(AST.Operand, String)] -> CodegenFunction AST.Operand
-phi incoming =
+phi :: AST.Type -> [(AST.Operand, String)] -> CodegenFunction AST.Operand
+phi resultType incoming =
   let incoming' = map (\(operand, label) -> (operand, AST.Name $ B.toShort $ BC.pack label)) incoming in
-  addNamedInstruction $ AST.Phi double incoming' []
+  addNamedInstruction resultType $ AST.Phi resultType incoming' []
 
 returnValue :: Maybe AST.Operand -> CodegenFunction ()
 returnValue val = addTerminator $ AST.Do $ AST.Ret val []
 
-addNamedInstruction :: AST.Instruction -> CodegenFunction AST.Operand
-addNamedInstruction instruction = do
+addNamedInstruction :: AST.Type -> AST.Instruction -> CodegenFunction AST.Operand
+addNamedInstruction instrType instruction = do
   n <- nextRegisterNumber
   let ref = (AST.UnName n)
   currentBasicBlock' <- gets _currentBasicBlock
   let currentBasicBlock'' = currentBasicBlock' { _instructions = _instructions currentBasicBlock' ++ [ref := instruction] }
   modify $ \s -> s { _currentBasicBlock = currentBasicBlock'' }
-  return $ AST.LocalReference double ref
+  return $ AST.LocalReference instrType ref
 
 addUnnamedInstruction :: AST.Instruction -> CodegenFunction ()
 addUnnamedInstruction instruction = do
@@ -303,9 +296,9 @@ addTerminator trm = do
   let currentBasicBlock'' = currentBasicBlock' { _terminator = Just trm }
   modify $ \s -> s { _currentBasicBlock = currentBasicBlock'' }
 
-addLocalReference :: String -> CodegenFunction AST.Operand
-addLocalReference name = do
-  let newSymbol = AST.LocalReference double (AST.Name $ B.toShort $ BC.pack name)
+addLocalReference :: (S.Name, S.Type) -> CodegenFunction AST.Operand
+addLocalReference (name, argType) = do
+  let newSymbol = AST.LocalReference (typeToType argType) (AST.Name $ B.toShort $ BC.pack name)
   modify $ \s -> s { _symbols = M.insert name newSymbol (_symbols s) }
   return newSymbol
 
@@ -313,6 +306,12 @@ getLocalReference :: String -> CodegenFunction (Maybe AST.Operand)
 getLocalReference name = do
   symbols' <- gets _symbols
   return $ M.lookup name symbols'
+
+typeToType :: S.Type -> AST.Type
+typeToType S.TypeUnit = AST.VoidType
+typeToType S.TypeFloat = double
+typeToType S.TypeInt = integer
+typeToType t = error $ "type not implemented: " ++ show t
 
 integer :: AST.Type
 integer = AST.IntegerType 32
