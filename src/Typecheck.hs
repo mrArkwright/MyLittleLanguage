@@ -76,11 +76,14 @@ typecheckExpr (Call cName exprs _ loc) = do
     Just signature -> return signature
     Nothing -> throwError ("function not found: " ++ cName, Just loc)
   (typedExprs, exprTypes) <- fmap unzip $ mapM typecheckExpr exprs
+  let numberArgumentsPasses = length exprTypes
+  let numberArgumentsExpected = length calleeParameters
+  when (numberArgumentsPasses /= numberArgumentsExpected) $ throwError ("call of function " ++ cName ++ ": wrong number of arguments. expected: " ++ show numberArgumentsExpected ++ ", passed: " ++ show numberArgumentsPasses, Just loc)
   mapM_ typecheckParameter $ zip calleeParameters exprTypes
   return (Call cName typedExprs calleeType loc, calleeType)
     where
       typecheckParameter :: (Type, Type) -> Typecheck ()
-      typecheckParameter (parameterType, exprType) = when (parameterType /= exprType) $ throwError ("function call: expected " ++ show parameterType ++ " but got " ++ show exprType, Just loc)
+      typecheckParameter (parameterType, exprType) = when (parameterType /= exprType) $ throwError ("call of function" ++ cName ++ ": expected " ++ show parameterType ++ " but got " ++ show exprType, Just loc)
 typecheckExpr (Do statements _ loc) = do
   (typedStatements, statementTypes) <- fmap unzip $ mapM typecheckStatement statements
   case lastMaybe statementTypes of
