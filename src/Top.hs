@@ -1,4 +1,4 @@
-module Top (repl, processFile) where
+module Top (repl, processFile, Options (..), defaultOptions) where
 
 import Data.Maybe
 import Data.List
@@ -19,15 +19,21 @@ import Codegen
 import Compile
 
 
-debug :: Bool
-debug = True
+data Options = Options {
+    _debug :: Bool
+  }
+
+defaultOptions :: Options
+defaultOptions = Options {
+    _debug = False
+  }
 
 --------------------------------------------------------------------------------
 -- REPL
 --------------------------------------------------------------------------------
 
-repl :: IO ()
-repl = do
+repl :: Options -> IO ()
+repl options = do
   putStrLn "---- MyLittleLanguage REPL ----"
   let moduleName = "<stdin>"
   let freshModule = initModule moduleName moduleName
@@ -39,7 +45,7 @@ repl = do
         Nothing    -> outputStrLn "Goodbye."
         Just ":q"  -> outputStrLn "Goodbye."
         Just input -> do
-          newModule <- liftIO $ runExceptT $ process moduleName astModule input
+          newModule <- liftIO $ runExceptT $ process options moduleName astModule input
           case newModule of
             Left err -> do
               liftIO $ print err
@@ -52,12 +58,12 @@ repl = do
 -- process file
 --------------------------------------------------------------------------------
 
-processFile :: String -> IO Bool
-processFile fileName = do
+processFile :: Options -> String -> IO Bool
+processFile options fileName = do
   source <- readFile fileName
   let moduleName = init $ dropWhileEnd (/= '.') $ fileName
   let freshModule = initModule moduleName fileName
-  newModule <- runExceptT $ process fileName freshModule source
+  newModule <- runExceptT $ process options fileName freshModule source
   case newModule of
     Left (err, loc) -> do
       let locString = fromMaybe "" $ fmap locDescription loc
@@ -73,10 +79,10 @@ processFile fileName = do
 -- common
 --------------------------------------------------------------------------------
 
-process :: String -> AST.Module -> String -> ExceptT Error IO AST.Module
-process name astModule source = do
+process :: Options -> String -> AST.Module -> String -> ExceptT Error IO AST.Module
+process options name astModule source = do
   definitions <- parse name source
-  when debug $ liftIO $ printDefinitions definitions
+  when (_debug options) $ liftIO $ printDefinitions definitions
   typedDefinitions <- typecheckProgram definitions
   codegen astModule typedDefinitions
 

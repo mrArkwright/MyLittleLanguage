@@ -24,7 +24,8 @@ main = hspec $ beforeAll (setCurrentDirectory "test") $ do
       let name = "example"
       let files = fmap ("build/" ++) [name ++ ".ll", name ++ ".s", name ++ ".o", "builtins.o", name]
       mapM_ removeFileIfExists files
-      success <- processFile (name ++ ".mll")
+      let options = Top.defaultOptions { _debug = True }
+      success <- processFile options (name ++ ".mll")
       shouldBe success True
       (exitCode, stdOutput, _) <- readProcessWithExitCode ("./build/" ++ name) [] ""
       putStr stdOutput
