@@ -16,6 +16,7 @@ dependencies:
   - mmorph
   - bytestring
   - containers
+  - multimap
   - process
   - directory
   - haskeline

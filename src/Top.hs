@@ -14,6 +14,7 @@ import qualified LLVM.AST as AST
 import Misc
 import Syntax
 import Parser
+import Rename
 import Typecheck
 import Codegen
 import Compile
@@ -81,13 +82,18 @@ processFile options fileName = do
 
 process :: Options -> String -> AST.Module -> String -> ExceptT Error IO AST.Module
 process options name astModule source = do
-  definitions <- parse name source
-  when (_debug options) $ liftIO $ printDefinitions definitions
-  typedDefinitions <- typecheckProgram definitions
+  parsedModule <- parse name source
+  when (_debug options) $ liftIO $ printModule parsedModule
+  renamedDefinitions <- rename parsedModule
+  typedDefinitions <- typecheckProgram renamedDefinitions
   codegen astModule typedDefinitions
 
-printDefinitions :: Show a => [Def a] -> IO ()
-printDefinitions definitions = do
-  putStrLn "---- Definitions ----"
-  mapM_ (putStrLn . (++ "\n") . show) definitions
+printModule :: Show a => Module a -> IO ()
+printModule module_ = printModule' [] module_ where
+  printModule' :: Show a => [String] -> Module a -> IO ()
+  printModule' modulePath (Module moduleName submodules definitions) = do
+    let modulePath' = modulePath ++ [moduleName]
+    putStrLn $ "---- Module \"" ++ intercalate "." modulePath' ++ "\" ----"
+    mapM_ (putStrLn . (++ "\n") . show) definitions
+    mapM_ (printModule' modulePath') submodules
 

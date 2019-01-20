@@ -5,6 +5,13 @@ import Misc
 
 type Name = String
 
+type SymbolPath = [Name]
+
+data Symbol = Symbol {
+    _symbolName :: Name,
+    _symbolPath :: SymbolPath
+  } deriving (Eq, Ord, Show)
+
 data Type
   = TypeUnit | TypeBoolean | TypeInt | TypeFloat
   deriving (Eq, Ord, Show)
@@ -21,6 +28,9 @@ data FuncDecl
   = FuncDecl Name FuncSignature
   deriving (Eq, Ord, Show)
 
+data Module tag
+  = Module Name [Module tag] [Def tag]
+
 data Def tag
   = Function Name Type [(Name, Type)] (Expr tag) Loc
   deriving (Eq, Ord, Show)
@@ -36,7 +46,7 @@ data Expr tag
   | Float Double tag Loc
   | Var Name tag Loc
   | If (Expr tag) (Expr tag) (Expr tag) tag Loc
-  | Call Name [(Expr tag)] tag Loc
+  | Call Symbol [(Expr tag)] tag Loc
   | Do [Statement tag] tag Loc
   deriving (Eq, Ord, Show)
 

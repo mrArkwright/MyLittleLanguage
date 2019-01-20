@@ -5,6 +5,7 @@ import Control.Monad.Except
 import Control.Monad.Morph
 
 import Data.Functor.Identity
+import Data.Either
 
 import Text.Parsec hiding (parse)
 import qualified Text.Parsec as P (parse)
@@ -17,7 +18,7 @@ import qualified Lexer as L
 import Syntax
 
 
-parse :: Monad m => String -> String -> ExceptT Error m [Def ()]
+parse :: Monad m => String -> String -> ExceptT Error m (Module ())
 parse name source = hoist generalize $ liftEither $ left parseErrorToError $ P.parse myLittleLanguageParser name source -- TODO extract error line
 
 parseErrorToError :: ParseError -> Error
@@ -26,13 +27,35 @@ parseErrorToError parseError =
   let errorMessage = showErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input" (errorMessages parseError) in
   (errorMessage, Just loc)
 
-myLittleLanguageParser :: Parser [Def ()]
+myLittleLanguageParser :: Parser (Module ())
 myLittleLanguageParser = do
   L.whiteSpace
-  definitions <- many definition
+  (modules, definitions) <- parseModuleContents
   eof
-  return definitions
+  return $ Module "Main" modules definitions -- TODO proper name for root module
 
+parseModule :: Parser (Module ())
+parseModule = do
+  L.reserved "module"
+  moduleName <- L.identifier
+  L.reserved "begin"
+  (submodules, defs) <- parseModuleContents
+  L.reserved "end"
+  return $ Module moduleName submodules defs
+
+parseModuleContents :: Parser ([Module ()], [Def ()])
+parseModuleContents = do
+  (defs, submodules) <- fmap partitionEithers $ many $ parseEither definition parseModule
+  return $ (submodules, defs)
+
+parseEither :: Parser a -> Parser b -> Parser (Either a b)
+parseEither parseA parseB = do
+  parsedA <- optionMaybe $ try parseA
+  case parsedA of
+    Just parsedA' -> return $ Left parsedA'
+    Nothing -> do
+      parsedB <- parseB
+      return $ Right parsedB
 
 --------------------------------------------------------------------------------
 -- types
@@ -109,7 +132,8 @@ binary s assoc = Infix (binaryParser s) assoc
 binaryParser :: String -> Parser (Expr () -> Expr () -> Expr ())
 binaryParser s = do
   loc <- sourcePosToLoc <$> getPosition
-  L.reservedOp s >> return (\x y -> Call s [x, y] () loc)
+  let symbol = Symbol s []
+  L.reservedOp s >> return (\x y -> Call symbol [x, y] () loc)
 
 opTable :: OperatorTable String () Identity (Expr ())
 opTable = [
@@ -156,9 +180,17 @@ ifThenElse = do
 call :: Parser (Expr ())
 call = do
   loc <- sourcePosToLoc <$> getPosition
+  modulePath <- parseModulePath
   name <- L.identifier
   args <- L.parens $ L.commaSep expr
-  return $ Call name args () loc
+  let symbol = Symbol name modulePath
+  return $ Call symbol args () loc
+
+parseModulePath :: Parser [String]
+parseModulePath = many $ try $ do
+  moduleName <- L.identifier
+  L.dot
+  return moduleName
 
 doBlock :: Parser (Expr ())
 doBlock = do

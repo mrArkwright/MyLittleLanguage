@@ -7,6 +7,7 @@ import Control.Monad.Except
 import Control.Monad.Morph
 
 import Data.Maybe
+import Data.List
 import qualified Data.Map as M
 import qualified Data.ByteString.Short as B (toShort)
 import qualified Data.ByteString.Char8 as BC
@@ -176,35 +177,36 @@ codegenExpression (S.If condition ifTrue ifFalse ifType loc) = do
       return $ Just ret
     (Nothing, Nothing) -> return Nothing
     _ -> throwError ("error", Just loc) -- TODO proper error message
-codegenExpression (S.Call name argExprs _ _) = do
+codegenExpression (S.Call symbol argExprs _ _) = do
   args <- map fromJust <$> mapM codegenExpression argExprs
-  case name of
-    "+" -> do
+  case symbol of
+    S.Symbol "+" [] -> do
       let [a, b] = args -- TODO proper error
       Just <$> add a b
-    "-" -> do
+    S.Symbol "-" [] -> do
       let [a, b] = args
       Just <$> sub a b
-    "<" -> do
+    S.Symbol "<" [] -> do
       let [a, b] = args
-      Just <$> icmp IPred.ULT a b
-    "+." -> do
+      Just <$> icmp IPred.SLT a b
+    S.Symbol "+." [] -> do
       let [a, b] = args
       Just <$> fadd a b
-    "-." -> do
+    S.Symbol "-." [] -> do
       let [a, b] = args
       Just <$> fsub a b
-    "*." -> do
+    S.Symbol "*." [] -> do
       let [a, b] = args
       Just <$> fmul a b
-    "/." -> do
+    S.Symbol "/." [] -> do
       let [a, b] = args
       Just <$> fdiv a b
-    "<." -> do
+    S.Symbol "<." [] -> do
       let [a, b] = args
       Just <$> fcmp FPred.ULT a b
-    _   -> do
+    _  -> do
       symbolTable <- ask
+      let name = intercalate "." $ S._symbolPath symbol ++ [S._symbolName symbol]
       let S.FuncSignature returnType argTypes = fromJust $ M.lookup name symbolTable
       let functionType = AST.ptr $ AST.FunctionType (typeToType returnType) (map typeToType argTypes) False
       let function = AST.ConstantOperand $ AST.C.GlobalReference functionType (AST.Name $ B.toShort $ BC.pack name)

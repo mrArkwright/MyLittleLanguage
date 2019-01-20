@@ -6,6 +6,7 @@ import Control.Monad.State
 import Control.Monad.Except
 import Control.Monad.Morph
 
+import Data.List
 import qualified Data.Map as M
 
 import Misc
@@ -70,20 +71,20 @@ typecheckExpr (If conditionExpr trueExpr falseExpr _ loc) = do
   (typedFalseExpr, falseExprType) <- typecheckExpr falseExpr
   when (trueExprType /= falseExprType) $ throwError ("types of if branches differ: " ++ show trueExprType ++ " and " ++ show falseExprType, Just loc)
   return (If typedConditionExpr typedTrueExpr typedFalseExpr trueExprType loc, trueExprType)
-typecheckExpr (Call cName exprs _ loc) = do
-  declaration <- findDefinition cName
+typecheckExpr (Call symbol exprs _ loc) = do
+  declaration <- findDefinition symbol
   FuncSignature calleeType calleeParameters <- case declaration of
     Just signature -> return signature
-    Nothing -> throwError ("function not found: " ++ cName, Just loc)
+    Nothing -> throwError ("function not found: " ++ _symbolName symbol, Just loc)
   (typedExprs, exprTypes) <- fmap unzip $ mapM typecheckExpr exprs
   let numberArgumentsPasses = length exprTypes
   let numberArgumentsExpected = length calleeParameters
-  when (numberArgumentsPasses /= numberArgumentsExpected) $ throwError ("call of function " ++ cName ++ ": wrong number of arguments. expected: " ++ show numberArgumentsExpected ++ ", passed: " ++ show numberArgumentsPasses, Just loc)
+  when (numberArgumentsPasses /= numberArgumentsExpected) $ throwError ("call of function " ++ _symbolName symbol ++ ": wrong number of arguments. expected: " ++ show numberArgumentsExpected ++ ", passed: " ++ show numberArgumentsPasses, Just loc)
   mapM_ typecheckParameter $ zip calleeParameters exprTypes
-  return (Call cName typedExprs calleeType loc, calleeType)
+  return (Call symbol typedExprs calleeType loc, calleeType)
     where
       typecheckParameter :: (Type, Type) -> Typecheck ()
-      typecheckParameter (parameterType, exprType) = when (parameterType /= exprType) $ throwError ("call of function" ++ cName ++ ": expected " ++ show parameterType ++ " but got " ++ show exprType, Just loc)
+      typecheckParameter (parameterType, exprType) = when (parameterType /= exprType) $ throwError ("call of function" ++ _symbolName symbol ++ ": expected " ++ show parameterType ++ " but got " ++ show exprType, Just loc)
 typecheckExpr (Do statements _ loc) = do
   (typedStatements, statementTypes) <- fmap unzip $ mapM typecheckStatement statements
   case lastMaybe statementTypes of
@@ -91,9 +92,10 @@ typecheckExpr (Do statements _ loc) = do
    Nothing -> throwError ("empty do block", Just loc)
 
 
-findDefinition :: Name -> Typecheck (Maybe FuncSignature)
-findDefinition name = do
+findDefinition :: Symbol -> Typecheck (Maybe FuncSignature)
+findDefinition symbol = do
   definitions <- ask
+  let name = intercalate "." $ _symbolPath symbol ++ [_symbolName symbol]
   return $ M.lookup name definitions
 
 findVariable :: Name -> Typecheck (Maybe Type)

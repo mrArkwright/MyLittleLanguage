@@ -30,6 +30,11 @@ reserved = Tok.reserved lexer
 reservedOp :: String -> Parser ()
 reservedOp = Tok.reservedOp lexer
 
+dot :: Parser ()
+dot = do
+  _ <- Tok.dot lexer
+  return ()
+
 whiteSpace :: Parser ()
 whiteSpace = Tok.whiteSpace lexer
 
@@ -37,7 +42,7 @@ whiteSpace = Tok.whiteSpace lexer
 lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser langDef where
   ops = ["+", "-", "<", "+.", "-.", "*.", "/.", "<.", "="]
-  names = ["def", "do", "end", "let", ":", "=", "if", "then", "else", "Unit", "Int", "Float", "()"]
+  names = ["module", "def", "do", "end", "let", ":", "=", "if", "then", "else", "Unit", "Int", "Float", "()"]
   langDef = emptyDef {
     Tok.commentLine = "//",
     Tok.commentStart = "/*",
