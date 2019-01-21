@@ -29,13 +29,13 @@ type Typecheck = StateT Context (ReaderT SymbolTable (Except Error))
 typecheckProgram :: Monad m => [Def ()] -> ExceptT Error m [Def Type]
 typecheckProgram definitions = hoist generalize $ do
   let builtinsSymbolTable = M.fromList $ map (\(FuncDecl name signature) -> (name, signature)) (builtins ++ libraryBuiltins)
-  symbolTable <- flip execStateT builtinsSymbolTable $ forM definitions $ \definition -> do
+  symbolTable <- execStateT' builtinsSymbolTable $ forM definitions $ \definition -> do
     let (FuncDecl fName fSignature) = defToFuncDecl definition
     symbolTable' <- get
     when (M.member fName symbolTable') $ throwError ("function \"" ++ fName ++ "\" redefined", Just $ locFromDef definition)
     put $ M.insert fName fSignature symbolTable'
 
-  flip runReaderT symbolTable $ mapM (flip evalStateT emptyContext . typecheckDef) definitions
+  runReaderT' symbolTable $ mapM (evalStateT' emptyContext . typecheckDef) definitions
 
 typecheckDef :: Def () -> Typecheck (Def Type)
 typecheckDef (Function name defType params expr loc) = do

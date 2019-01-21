@@ -42,7 +42,7 @@ initModule name fileName = AST.defaultModule {
   }
 
 codegen :: Monad m => AST.Module -> [(S.Def S.Type)] -> ExceptT Error m AST.Module
-codegen astModule definitions = hoist generalize $ flip execStateT astModule $ do
+codegen astModule definitions = hoist generalize $ execStateT' astModule $ do
   let functionDeclarations = builtins ++ libraryBuiltins ++ map S.defToFuncDecl definitions
   let symbolTable = M.fromList $ map (\(S.FuncDecl name signature) -> (name, signature)) functionDeclarations
   mapM_ codegenDeclaration libraryBuiltins
@@ -107,7 +107,7 @@ emptyBasicBlock name = BasicBlock {
 type CodegenFunction = ReaderT SymbolTable (StateT Function (Except Error))
 
 codegenFunction :: SymbolTable -> [(S.Name, S.Type)] -> S.Expr S.Type -> Except Error [AST.BasicBlock]
-codegenFunction symbolTable args body = (flip evalStateT) emptyFunction $ (flip runReaderT) symbolTable $ do
+codegenFunction symbolTable args body = evalStateT' emptyFunction $ runReaderT' symbolTable $ do
   mapM_ addLocalReference args
   result <- codegenExpression body
   returnValue result

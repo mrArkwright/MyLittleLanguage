@@ -19,7 +19,7 @@ type Rename = StateT SymbolTable (Except Error)
 
 
 rename :: Monad m => Module () -> ExceptT Error m [Def ()]
-rename module_ = hoist generalize $ flip evalStateT MM.empty $ do
+rename module_ = hoist generalize $ evalStateT' MM.empty $ do
   mapM_ importBuiltin (builtins ++ libraryBuiltins)
   importModuleVerbatim module_
   renameModule module_

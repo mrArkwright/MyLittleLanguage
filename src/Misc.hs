@@ -1,5 +1,7 @@
 module Misc where
 
+import Control.Monad.Reader
+import Control.Monad.State
 import Control.Monad.Except
 
 import Data.Maybe
@@ -22,6 +24,15 @@ maybeError value errorString = fromMaybe (error errorString) value
 maybeToExcept :: MonadError e m => Maybe a -> e -> m a
 maybeToExcept (Just x) _ = return x
 maybeToExcept Nothing err = throwError err
+
+runReaderT' :: r -> ReaderT r m a -> m a
+runReaderT' = flip runReaderT
+
+evalStateT' :: Monad m => s -> StateT s m a -> m a
+evalStateT' = flip evalStateT
+
+execStateT' :: Monad m => s -> StateT s m a -> m s
+execStateT' = flip execStateT
 
 buildFolder :: String
 buildFolder = "build"
