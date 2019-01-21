@@ -7,7 +7,6 @@ import Control.Monad.Except
 import Control.Monad.Morph
 
 import Data.Maybe
-import Data.List
 import qualified Data.Map as M
 import qualified Data.ByteString.Short as B (toShort)
 import qualified Data.ByteString.Char8 as BC
@@ -27,7 +26,7 @@ import Builtins
 import qualified Syntax as S
 
 
-type SymbolTable = M.Map S.Name S.FuncSignature
+type SymbolTable = M.Map S.Symbol S.FuncSignature
 
 --------------------------------------------------------------------------------
 -- Modules
@@ -44,24 +43,24 @@ initModule name fileName = AST.defaultModule {
 codegen :: Monad m => AST.Module -> [(S.Def S.Type)] -> ExceptT Error m AST.Module
 codegen astModule definitions = hoist generalize $ execStateT' astModule $ do
   let functionDeclarations = builtins ++ libraryBuiltins ++ map S.defToFuncDecl definitions
-  let symbolTable = M.fromList $ map (\(S.FuncDecl name signature) -> (name, signature)) functionDeclarations
+  let symbolTable = M.fromList $ map (\(S.FuncDecl symbol signature) -> (symbol, signature)) functionDeclarations
   mapM_ codegenDeclaration libraryBuiltins
   mapM_ (codegenDefinition symbolTable) definitions
 
 codegenDeclaration :: S.FuncDecl -> Codegen ()
-codegenDeclaration (S.FuncDecl funcName (S.FuncSignature returnType args)) = addGlobalFunction funcName returnType namedArgs [] where
+codegenDeclaration (S.FuncDecl symbol (S.FuncSignature returnType args)) = addGlobalFunction symbol returnType namedArgs [] where
   namedArgs = map (\(arg, i) -> ("x" ++ show i, arg)) $ zip args [(1 :: Int)..]
 
 codegenDefinition :: SymbolTable -> S.Def S.Type -> Codegen ()
-codegenDefinition symbolTable (S.Function name returnType args body _) = do
+codegenDefinition symbolTable (S.Function symbol returnType args body _) = do
   basicBlocks <- lift $ codegenFunction symbolTable args body
-  addGlobalFunction name returnType args basicBlocks
+  addGlobalFunction symbol returnType args basicBlocks
 
-addGlobalFunction :: String -> S.Type -> [(S.Name, S.Type)] -> [AST.BasicBlock] -> Codegen ()
-addGlobalFunction name returnType args basicBlocks = do
+addGlobalFunction :: S.Symbol -> S.Type -> [(S.Name, S.Type)] -> [AST.BasicBlock] -> Codegen ()
+addGlobalFunction symbol returnType args basicBlocks = do
   let args' = map (\(argName, argType) -> AST.Parameter (typeToType argType) (AST.Name $ B.toShort $ BC.pack $ argName) []) args
   let def = AST.GlobalDefinition $ AST.functionDefaults {
-    AST.name        = AST.Name (B.toShort $ BC.pack name),
+    AST.name        = AST.Name (B.toShort $ BC.pack $ S.symbolToString symbol),
     AST.parameters  = (args', False),
     AST.returnType  = typeToType returnType,
     AST.basicBlocks = basicBlocks
@@ -206,10 +205,9 @@ codegenExpression (S.Call symbol argExprs _ _) = do
       Just <$> fcmp FPred.ULT a b
     _  -> do
       symbolTable <- ask
-      let name = intercalate "." $ S._symbolPath symbol ++ [S._symbolName symbol]
-      let S.FuncSignature returnType argTypes = fromJust $ M.lookup name symbolTable
+      let S.FuncSignature returnType argTypes = fromJust $ M.lookup symbol symbolTable
       let functionType = AST.ptr $ AST.FunctionType (typeToType returnType) (map typeToType argTypes) False
-      let function = AST.ConstantOperand $ AST.C.GlobalReference functionType (AST.Name $ B.toShort $ BC.pack name)
+      let function = AST.ConstantOperand $ AST.C.GlobalReference functionType (AST.Name $ B.toShort $ BC.pack $ S.symbolToString symbol)
       call (returnType /= S.TypeUnit) (typeToType returnType) function args
 codegenExpression (S.Do statements _ _) = do
   results <- mapM codegenStatement statements

@@ -6,7 +6,6 @@ import Control.Monad.State
 import Control.Monad.Except
 import Control.Monad.Morph
 
-import Data.List
 import qualified Data.Map as M
 
 import Misc
@@ -21,29 +20,29 @@ data Context = Context {
 emptyContext :: Context
 emptyContext = Context M.empty
 
-type SymbolTable = M.Map Name FuncSignature
+type SymbolTable = M.Map Symbol FuncSignature
 
 type Typecheck = StateT Context (ReaderT SymbolTable (Except Error))
 
 
 typecheckProgram :: Monad m => [Def ()] -> ExceptT Error m [Def Type]
 typecheckProgram definitions = hoist generalize $ do
-  let builtinsSymbolTable = M.fromList $ map (\(FuncDecl name signature) -> (name, signature)) (builtins ++ libraryBuiltins)
+  let builtinsSymbolTable = M.fromList $ map (\(FuncDecl symbol signature) -> (symbol, signature)) (builtins ++ libraryBuiltins)
   symbolTable <- execStateT' builtinsSymbolTable $ forM definitions $ \definition -> do
-    let (FuncDecl fName fSignature) = defToFuncDecl definition
+    let (FuncDecl fSymbol fSignature) = defToFuncDecl definition
     symbolTable' <- get
-    when (M.member fName symbolTable') $ throwError ("function \"" ++ fName ++ "\" redefined", Just $ locFromDef definition)
-    put $ M.insert fName fSignature symbolTable'
+    when (M.member fSymbol symbolTable') $ throwError ("function \"" ++ symbolToString fSymbol ++ "\" redefined", Just $ locFromDef definition)
+    put $ M.insert fSymbol fSignature symbolTable'
 
   runReaderT' symbolTable $ mapM (evalStateT' emptyContext . typecheckDef) definitions
 
 typecheckDef :: Def () -> Typecheck (Def Type)
-typecheckDef (Function name defType params expr loc) = do
+typecheckDef (Function symbol defType params expr loc) = do
   let params' = map (\(paramName, paramType) -> VarDecl paramName paramType loc) params
   mapM_ addVariable params'
   (typedExpr, exprType) <- typecheckExpr expr
-  when (defType /= exprType) $ throwError ("definition of \"" ++ name ++ "\": expected " ++ show defType ++ " but got " ++ show exprType, Just loc)
-  return $ Function name defType params typedExpr loc
+  when (defType /= exprType) $ throwError ("definition of \"" ++ symbolToString symbol ++ "\": expected " ++ show defType ++ " but got " ++ show exprType, Just loc)
+  return $ Function symbol defType params typedExpr loc
 
 typecheckStatement :: Statement () -> Typecheck (Statement Type, Type)
 typecheckStatement (Expr expr () loc) = do
@@ -94,9 +93,8 @@ typecheckExpr (Do statements _ loc) = do
 
 findDefinition :: Symbol -> Typecheck (Maybe FuncSignature)
 findDefinition symbol = do
-  definitions <- ask
-  let name = intercalate "." $ _symbolPath symbol ++ [_symbolName symbol]
-  return $ M.lookup name definitions
+  symbolTable <- ask
+  return $ M.lookup symbol symbolTable
 
 findVariable :: Name -> Typecheck (Maybe Type)
 findVariable name = do

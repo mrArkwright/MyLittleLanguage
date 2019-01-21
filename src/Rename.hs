@@ -4,7 +4,6 @@ import Control.Monad.State
 import Control.Monad.Except
 import Control.Monad.Morph
 
-import Data.List
 import qualified Data.MultiMap as MM
 
 import Misc
@@ -26,9 +25,7 @@ rename module_ = hoist generalize $ evalStateT' MM.empty $ do
 
 
 importBuiltin :: FuncDecl -> Rename ()
-importBuiltin (FuncDecl name _) = do
-  let symbol = Symbol name []
-  modify $ MM.insert symbol symbol
+importBuiltin (FuncDecl symbol _) = modify $ MM.insert symbol symbol
 
 
 importModuleVerbatim :: Module () -> Rename ()
@@ -56,7 +53,7 @@ importSubmodule importPath modulePath (Module moduleName submodules definitions)
 importDefinition :: SymbolPath -> SymbolPath -> Def () -> Rename ()
 importDefinition importPath symbolPath definition = do
 
-  let (FuncDecl name _) = defToFuncDecl definition
+  let (FuncDecl (Symbol name _) _) = defToFuncDecl definition
   let symbol = Symbol name symbolPath
   let importedSymbol = Symbol name importPath
 
@@ -89,13 +86,13 @@ renameModule = renameModule' [] where
 
 
 renameDefinition :: SymbolPath -> Def () -> Rename (Def ())
-renameDefinition modulePath (Function fName fType fArgs fExpr fLoc) = do
+renameDefinition modulePath (Function symbol returnType args expr loc) = do
 
-  let fName' = intercalate "." $ modulePath ++ [fName]
+  let symbol' = Symbol (_symbolName symbol) modulePath
 
-  fExpr' <- renameExpr fExpr
+  expr' <- renameExpr expr
 
-  return $ Function fName' fType fArgs fExpr' fLoc
+  return $ Function symbol' returnType args expr' loc
 
 
 renameExpr :: Expr () -> Rename (Expr ())

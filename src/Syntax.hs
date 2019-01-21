@@ -1,5 +1,7 @@
 module Syntax where
 
+import Data.List
+
 import Misc
 
 
@@ -25,14 +27,14 @@ data FuncSignature
   deriving (Eq, Ord, Show)
 
 data FuncDecl
-  = FuncDecl Name FuncSignature
+  = FuncDecl Symbol FuncSignature
   deriving (Eq, Ord, Show)
 
 data Module tag
   = Module Name [Module tag] [Def tag]
 
 data Def tag
-  = Function Name Type [(Name, Type)] (Expr tag) Loc
+  = Function Symbol Type [(Name, Type)] (Expr tag) Loc
   deriving (Eq, Ord, Show)
 
 data Statement tag
@@ -54,8 +56,11 @@ locFromDef :: Def tag -> Loc
 locFromDef (Function _ _ _ _ loc) = loc
 
 defToFuncDecl :: Def tag -> FuncDecl
-defToFuncDecl (Function name fType params _ _) =
+defToFuncDecl (Function symbol fType params _ _) =
   let params' = map (\(_, paramType) -> paramType) params in
   let signature = FuncSignature fType params' in
-  FuncDecl name signature
+  FuncDecl symbol signature
+
+symbolToString :: Symbol -> String
+symbolToString (Symbol symbolName symbolPath) = intercalate "." $ symbolPath ++ [symbolName]
 

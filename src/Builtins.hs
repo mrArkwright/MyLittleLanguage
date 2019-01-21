@@ -5,24 +5,24 @@ import Syntax
 
 builtins :: [FuncDecl]
 builtins = [
-    FuncDecl "+" (FuncSignature TypeInt [TypeInt, TypeInt]),
-    FuncDecl "-" (FuncSignature TypeInt [TypeInt, TypeInt]),
-    FuncDecl "<" (FuncSignature TypeBoolean [TypeInt, TypeInt]),
-    FuncDecl "+." (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
-    FuncDecl "-." (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
-    FuncDecl "*." (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
-    FuncDecl "/." (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
-    FuncDecl "<." (FuncSignature TypeBoolean [TypeFloat, TypeFloat])
+    FuncDecl (Symbol "+" []) (FuncSignature TypeInt [TypeInt, TypeInt]),
+    FuncDecl (Symbol "-" []) (FuncSignature TypeInt [TypeInt, TypeInt]),
+    FuncDecl (Symbol "<" []) (FuncSignature TypeBoolean [TypeInt, TypeInt]),
+    FuncDecl (Symbol "+." []) (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
+    FuncDecl (Symbol "-." []) (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
+    FuncDecl (Symbol "*." []) (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
+    FuncDecl (Symbol "/." []) (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
+    FuncDecl (Symbol "<." []) (FuncSignature TypeBoolean [TypeFloat, TypeFloat])
   ]
 
 libraryBuiltins :: [FuncDecl]
 libraryBuiltins = [
-    FuncDecl "exitSuccess" (FuncSignature TypeUnit []),
-    FuncDecl "exitFailure" (FuncSignature TypeUnit []),
-    FuncDecl "printInt" (FuncSignature TypeUnit [TypeInt]),
-    FuncDecl "printChar" (FuncSignature TypeUnit [TypeInt]),
-    FuncDecl "printFloat" (FuncSignature TypeUnit [TypeFloat]),
-    FuncDecl "sin" (FuncSignature TypeFloat [TypeFloat]),
-    FuncDecl "sqrt" (FuncSignature TypeFloat [TypeFloat])
+    FuncDecl (Symbol "exitSuccess" []) (FuncSignature TypeUnit []),
+    FuncDecl (Symbol "exitFailure" []) (FuncSignature TypeUnit []),
+    FuncDecl (Symbol "printInt" []) (FuncSignature TypeUnit [TypeInt]),
+    FuncDecl (Symbol "printChar" []) (FuncSignature TypeUnit [TypeInt]),
+    FuncDecl (Symbol "printFloat" []) (FuncSignature TypeUnit [TypeFloat]),
+    FuncDecl (Symbol "sin" []) (FuncSignature TypeFloat [TypeFloat]),
+    FuncDecl (Symbol "sqrt" []) (FuncSignature TypeFloat [TypeFloat])
   ]
 

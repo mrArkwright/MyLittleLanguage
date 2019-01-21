@@ -86,12 +86,13 @@ parseFunction = do
   loc <- sourcePosToLoc <$> getPosition
   L.parseReserved "def"
   name <- L.parseIdentifier
+  let symbol = Symbol name []
   args <- L.parseParens $ L.parseCommaSep parseArg
   L.parseReserved ":"
   functionType <- parseType
   L.parseReserved "="
   body <- parseExpr
-  return $ Function name functionType args body loc
+  return $ Function symbol functionType args body loc
 
 parseArg :: Parser (Name, Type)
 parseArg = do
