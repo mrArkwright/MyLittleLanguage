@@ -6,6 +6,9 @@ import Control.Monad.Except
 
 import Data.Maybe
 
+import Text.Parsec (try, optionMaybe)
+import Text.Parsec.String (Parser)
+
 
 
 data Loc = FileLineLocation String Int
@@ -42,4 +45,13 @@ inBuildFolder path = buildFolder ++ "/" ++ path
 
 locDescription :: Loc -> String
 locDescription (FileLineLocation sourceName lineNumber) = sourceName ++ ", line " ++ show lineNumber ++ ": "
+
+parseEither :: Parser a -> Parser b -> Parser (Either a b)
+parseEither parseA parseB = do
+  parsedA <- optionMaybe $ try parseA
+  case parsedA of
+    Just parsedA' -> return $ Left parsedA'
+    Nothing -> do
+      parsedB <- parseB
+      return $ Right parsedB
 

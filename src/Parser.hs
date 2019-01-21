@@ -19,7 +19,7 @@ import Syntax
 
 
 parse :: Monad m => String -> String -> ExceptT Error m (Module ())
-parse name source = hoist generalize $ liftEither $ left parseErrorToError $ P.parse myLittleLanguageParser name source -- TODO extract error line
+parse name source = hoist generalize $ liftEither $ left parseErrorToError $ P.parse mainParser name source
 
 parseErrorToError :: ParseError -> Error
 parseErrorToError parseError =
@@ -27,35 +27,27 @@ parseErrorToError parseError =
   let errorMessage = showErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input" (errorMessages parseError) in
   (errorMessage, Just loc)
 
-myLittleLanguageParser :: Parser (Module ())
-myLittleLanguageParser = do
-  L.whiteSpace
+mainParser :: Parser (Module ())
+mainParser = do
+  L.parseWhiteSpace
   (modules, definitions) <- parseModuleContents
   eof
-  return $ Module "Main" modules definitions -- TODO proper name for root module
-
-parseModule :: Parser (Module ())
-parseModule = do
-  L.reserved "module"
-  moduleName <- L.identifier
-  L.reserved "begin"
-  (submodules, defs) <- parseModuleContents
-  L.reserved "end"
-  return $ Module moduleName submodules defs
+  return $ Module "Main" modules definitions
 
 parseModuleContents :: Parser ([Module ()], [Def ()])
 parseModuleContents = do
-  (defs, submodules) <- fmap partitionEithers $ many $ parseEither definition parseModule
+  (defs, submodules) <- fmap partitionEithers $ many $ parseEither parseDefinition parseModule
   return $ (submodules, defs)
 
-parseEither :: Parser a -> Parser b -> Parser (Either a b)
-parseEither parseA parseB = do
-  parsedA <- optionMaybe $ try parseA
-  case parsedA of
-    Just parsedA' -> return $ Left parsedA'
-    Nothing -> do
-      parsedB <- parseB
-      return $ Right parsedB
+parseModule :: Parser (Module ())
+parseModule = do
+  L.parseReserved "module"
+  moduleName <- L.parseIdentifier
+  L.parseReserved "begin"
+  (submodules, defs) <- parseModuleContents
+  L.parseReserved "end"
+  return $ Module moduleName submodules defs
+
 
 --------------------------------------------------------------------------------
 -- types
@@ -68,163 +60,163 @@ parseType = parseUnitType
 
 parseUnitType :: Parser Type
 parseUnitType = do
-  L.reserved "Unit"
+  L.parseReserved "Unit"
   return TypeUnit
 
 parseIntType :: Parser Type
 parseIntType = do
-  L.reserved "Int"
+  L.parseReserved "Int"
   return TypeInt
 
 parseFloatType :: Parser Type
 parseFloatType = do
-  L.reserved "Float"
+  L.parseReserved "Float"
   return TypeFloat
+
 
 --------------------------------------------------------------------------------
 -- definitions
 --------------------------------------------------------------------------------
 
-definition :: Parser (Def ())
-definition = try function
+parseDefinition :: Parser (Def ())
+parseDefinition = try parseFunction
 
-function :: Parser (Def ())
-function = do
+parseFunction :: Parser (Def ())
+parseFunction = do
   loc <- sourcePosToLoc <$> getPosition
-  L.reserved "def"
-  name <- L.identifier
-  args <- L.parens $ L.commaSep parseArg
-  L.reserved ":"
+  L.parseReserved "def"
+  name <- L.parseIdentifier
+  args <- L.parseParens $ L.parseCommaSep parseArg
+  L.parseReserved ":"
   functionType <- parseType
-  L.reserved "="
-  body <- expr
+  L.parseReserved "="
+  body <- parseExpr
   return $ Function name functionType args body loc
 
 parseArg :: Parser (Name, Type)
 parseArg = do
-  argName <- L.identifier
-  L.reserved ":"
+  argName <- L.parseIdentifier
+  L.parseReserved ":"
   argType <- parseType
   return (argName, argType)
-
 
 
 --------------------------------------------------------------------------------
 -- expressions
 --------------------------------------------------------------------------------
 
-expr :: Parser (Expr ())
-expr = buildExpressionParser opTable factor
+parseExpr :: Parser (Expr ())
+parseExpr = buildExpressionParser operatorTable parseFactor
 
-factor :: Parser (Expr ())
-factor = try parseUnit
-  <|> try float
-  <|> try integer
-  <|> try call
-  <|> variable
-  <|> ifThenElse
-  <|> doBlock
-  <|> L.parens expr
+parseFactor :: Parser (Expr ())
+parseFactor = try parseUnit
+  <|> try parseFloat
+  <|> try parseInteger
+  <|> try parseCall
+  <|> parseVariable
+  <|> parseIf
+  <|> parseDoBlock
+  <|> L.parseParens parseExpr
 
-binary :: String -> Assoc -> Operator String () Identity (Expr ())
-binary s assoc = Infix (binaryParser s) assoc
-
-binaryParser :: String -> Parser (Expr () -> Expr () -> Expr ())
-binaryParser s = do
-  loc <- sourcePosToLoc <$> getPosition
-  let symbol = Symbol s []
-  L.reservedOp s >> return (\x y -> Call symbol [x, y] () loc)
-
-opTable :: OperatorTable String () Identity (Expr ())
-opTable = [
-    [binary "*." AssocLeft, binary "/." AssocLeft],
-    [binary "+" AssocLeft, binary "-" AssocLeft, binary "+." AssocLeft, binary "-." AssocLeft],
-    [binary "<" AssocLeft, binary "<." AssocLeft]
+operatorTable :: OperatorTable String () Identity (Expr ())
+operatorTable = [
+    [binaryOperator "*." AssocLeft, binaryOperator "/." AssocLeft],
+    [binaryOperator "+" AssocLeft, binaryOperator "-" AssocLeft, binaryOperator "+." AssocLeft, binaryOperator "-." AssocLeft],
+    [binaryOperator "<" AssocLeft, binaryOperator "<." AssocLeft]
   ]
+
+binaryOperator :: String -> Assoc -> Operator String () Identity (Expr ())
+binaryOperator name assoc = Infix (parseBinaryOperator name) assoc
+
+parseBinaryOperator :: String -> Parser (Expr () -> Expr () -> Expr ())
+parseBinaryOperator name = do
+  loc <- sourcePosToLoc <$> getPosition
+  let symbol = Symbol name []
+  L.parseReservedOperator name
+  return $ \x y -> Call symbol [x, y] () loc
 
 parseUnit :: Parser (Expr ())
 parseUnit = do
   loc <- sourcePosToLoc <$> getPosition
-  L.reserved "()"
+  L.parseReserved "()"
   return $ Unit () loc
 
-integer :: Parser (Expr ())
-integer = do
+parseInteger :: Parser (Expr ())
+parseInteger = do
   loc <- sourcePosToLoc <$> getPosition
-  value <- L.integer
+  value <- L.parseInteger
   return $ Int value () loc
 
-float :: Parser (Expr ())
-float = do
+parseFloat :: Parser (Expr ())
+parseFloat = do
   loc <- sourcePosToLoc <$> getPosition
-  value <- L.float
+  value <- L.parseFloat
   return $ Float value () loc
 
-variable :: Parser (Expr ())
-variable = do
+parseVariable :: Parser (Expr ())
+parseVariable = do
   loc <- sourcePosToLoc <$> getPosition
-  name <- L.identifier
+  name <- L.parseIdentifier
   return $ Var name () loc
 
-ifThenElse :: Parser (Expr ())
-ifThenElse = do
+parseIf :: Parser (Expr ())
+parseIf = do
   loc <- sourcePosToLoc <$> getPosition
-  L.reserved "if"
-  condition <- expr
-  L.reserved "then"
-  ifTrue <- expr
-  L.reserved "else"
-  ifFalse <- expr
+  L.parseReserved "if"
+  condition <- parseExpr
+  L.parseReserved "then"
+  ifTrue <- parseExpr
+  L.parseReserved "else"
+  ifFalse <- parseExpr
   return $ If condition ifTrue ifFalse () loc
 
-call :: Parser (Expr ())
-call = do
+parseCall :: Parser (Expr ())
+parseCall = do
   loc <- sourcePosToLoc <$> getPosition
   modulePath <- parseModulePath
-  name <- L.identifier
-  args <- L.parens $ L.commaSep expr
+  name <- L.parseIdentifier
+  args <- L.parseParens $ L.parseCommaSep parseExpr
   let symbol = Symbol name modulePath
   return $ Call symbol args () loc
 
 parseModulePath :: Parser [String]
 parseModulePath = many $ try $ do
-  moduleName <- L.identifier
-  L.dot
+  moduleName <- L.parseIdentifier
+  L.parseDot
   return moduleName
 
-doBlock :: Parser (Expr ())
-doBlock = do
+parseDoBlock :: Parser (Expr ())
+parseDoBlock = do
   loc <- sourcePosToLoc <$> getPosition
-  L.reserved "do"
-  statements <- many statement
-  L.reserved "end"
+  L.parseReserved "do"
+  statements <- many parseStatement
+  L.parseReserved "end"
   return $ Do statements () loc
-
 
 
 --------------------------------------------------------------------------------
 -- statements
 --------------------------------------------------------------------------------
 
-statement :: Parser (Statement ())
-statement = try expressionStatement
-        <|> letStatement
+parseStatement :: Parser (Statement ())
+parseStatement = try parseExpressionStatement
+  <|> parseLetStatement
 
-expressionStatement :: Parser (Statement ())
-expressionStatement = do
+parseExpressionStatement :: Parser (Statement ())
+parseExpressionStatement = do
   loc <- sourcePosToLoc <$> getPosition
-  expression <- expr
+  expression <- parseExpr
   return $ Expr expression () loc
 
-letStatement :: Parser (Statement ())
-letStatement = do
+parseLetStatement :: Parser (Statement ())
+parseLetStatement = do
   loc <- sourcePosToLoc <$> getPosition
-  L.reserved "let"
-  name <- L.identifier
-  L.reserved ":"
+  L.parseReserved "let"
+  name <- L.parseIdentifier
+  L.parseReserved ":"
   letType <- parseType
-  L.reserved "="
-  expression <- expr
+  L.parseReserved "="
+  expression <- parseExpr
   return $ Let name letType expression () loc
 
 

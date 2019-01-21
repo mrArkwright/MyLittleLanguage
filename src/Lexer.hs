@@ -1,4 +1,15 @@
-module Lexer where
+module Lexer (
+    parseInteger,
+    parseFloat,
+    parseParens,
+    parseCommaSep,
+    parseSemiSep,
+    parseIdentifier,
+    parseReserved,
+    parseReservedOperator,
+    parseDot,
+    parseWhiteSpace
+  ) where
 
 import Text.Parsec.String (Parser)
 import Text.Parsec.Language (emptyDef)
@@ -6,47 +17,48 @@ import Text.Parsec.Language (emptyDef)
 import qualified Text.Parsec.Token as Tok
 
 
-integer :: Parser Integer
-integer = Tok.integer lexer
+parseInteger :: Parser Integer
+parseInteger = Tok.integer lexer
 
-float :: Parser Double
-float = Tok.float lexer
+parseFloat :: Parser Double
+parseFloat = Tok.float lexer
 
-parens :: Parser a -> Parser a
-parens = Tok.parens lexer
+parseParens :: Parser a -> Parser a
+parseParens = Tok.parens lexer
 
-commaSep :: Parser a -> Parser [a]
-commaSep = Tok.commaSep lexer
+parseCommaSep :: Parser a -> Parser [a]
+parseCommaSep = Tok.commaSep lexer
 
-semiSep :: Parser a -> Parser [a]
-semiSep = Tok.semiSep lexer
+parseSemiSep :: Parser a -> Parser [a]
+parseSemiSep = Tok.semiSep lexer
 
-identifier :: Parser String
-identifier = Tok.identifier lexer
+parseIdentifier :: Parser String
+parseIdentifier = Tok.identifier lexer
 
-reserved :: String -> Parser ()
-reserved = Tok.reserved lexer
+parseReserved :: String -> Parser ()
+parseReserved = Tok.reserved lexer
 
-reservedOp :: String -> Parser ()
-reservedOp = Tok.reservedOp lexer
+parseReservedOperator :: String -> Parser ()
+parseReservedOperator = Tok.reservedOp lexer
 
-dot :: Parser ()
-dot = do
+parseDot :: Parser ()
+parseDot = do
   _ <- Tok.dot lexer
   return ()
 
-whiteSpace :: Parser ()
-whiteSpace = Tok.whiteSpace lexer
+parseWhiteSpace :: Parser ()
+parseWhiteSpace = Tok.whiteSpace lexer
 
 
 lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser langDef where
-  ops = ["+", "-", "<", "+.", "-.", "*.", "/.", "<.", "="]
-  names = ["module", "def", "do", "end", "let", ":", "=", "if", "then", "else", "Unit", "Int", "Float", "()"]
+  reservedNames = ["module", "def", "do", "end", "let", "if", "then", "else", "Unit", "Int", "Float"]
+  reservedOpNames = ["+", "-", "<", "+.", "-.", "*.", "/.", "<.", "="]
   langDef = emptyDef {
     Tok.commentLine = "//",
     Tok.commentStart = "/*",
     Tok.commentEnd = "*/",
-    Tok.reservedOpNames = ops,
-    Tok.reservedNames = names
+    Tok.reservedNames = reservedNames,
+    Tok.reservedOpNames = reservedOpNames
   }
+
