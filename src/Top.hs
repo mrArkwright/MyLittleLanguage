@@ -13,7 +13,7 @@ import qualified LLVM.AST as AST
 
 import Misc
 import Syntax
-import Parser
+import Parse
 import Rename
 import Typecheck
 import Codegen

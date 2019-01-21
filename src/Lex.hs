@@ -1,4 +1,4 @@
-module Lexer (
+module Lex (
     parseInteger,
     parseFloat,
     parseParens,

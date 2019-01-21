@@ -1,4 +1,4 @@
-module Parser (parse) where
+module Parse (parse) where
 
 import Control.Arrow (left)
 import Control.Monad.Except
@@ -14,7 +14,7 @@ import Text.Parsec.Expr
 import Text.Parsec.Error
 
 import Misc
-import qualified Lexer as L
+import qualified Lex as L
 import Syntax
 
 
