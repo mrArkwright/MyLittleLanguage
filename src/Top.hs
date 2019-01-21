@@ -92,7 +92,7 @@ printModule :: Show a => Module a -> IO ()
 printModule module_ = printModule' [] module_ where
   printModule' :: Show a => [String] -> Module a -> IO ()
   printModule' modulePath (Module moduleName submodules definitions) = do
-    let modulePath' = modulePath ++ [moduleName]
+    let modulePath' = modulePath -:+ moduleName
     putStrLn $ "---- Module \"" ++ intercalate "." modulePath' ++ "\" ----"
     mapM_ (putStrLn . (++ "\n") . show) definitions
     mapM_ (printModule' modulePath') submodules

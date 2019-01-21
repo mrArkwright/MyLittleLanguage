@@ -62,5 +62,5 @@ defToFuncDecl (Function symbol fType params _ _) =
   FuncDecl symbol signature
 
 symbolToString :: Symbol -> String
-symbolToString (Symbol symbolName symbolPath) = intercalate "." $ symbolPath ++ [symbolName]
+symbolToString (Symbol symbolName symbolPath) = intercalate "." $ symbolPath -:+ symbolName
 

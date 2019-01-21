@@ -34,7 +34,7 @@ importModuleVerbatim = importModuleVerbatim' [] where
   importModuleVerbatim' :: SymbolPath -> Module () -> Rename ()
   importModuleVerbatim' modulePath (Module moduleName submodules definitions) = do
 
-    let modulePath' = modulePath ++ [moduleName]
+    let modulePath' = modulePath -:+ moduleName
 
     mapM_ (importDefinition modulePath' modulePath') definitions
     mapM_ (importModuleVerbatim' modulePath') submodules
@@ -43,8 +43,8 @@ importModuleVerbatim = importModuleVerbatim' [] where
 importSubmodule :: SymbolPath -> SymbolPath -> Module () -> Rename ()
 importSubmodule importPath modulePath (Module moduleName submodules definitions) = do
 
-  let modulePath' = modulePath ++ [moduleName]
-  let importPath' = importPath ++ [moduleName]
+  let modulePath' = modulePath -:+ moduleName
+  let importPath' = importPath -:+ moduleName
 
   mapM_ (importDefinition importPath' modulePath') definitions
   mapM_ (importSubmodule importPath' modulePath') submodules
@@ -71,7 +71,7 @@ renameModule = renameModule' [] where
 
     symbolTableBefore <- get
 
-    let modulePath' = modulePath ++ [moduleName]
+    let modulePath' = modulePath -:+ moduleName
 
     mapM_ (importDefinition [] modulePath') definitions
     mapM_ (importSubmodule [] modulePath') submodules

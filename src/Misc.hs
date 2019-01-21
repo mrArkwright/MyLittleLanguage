@@ -28,6 +28,10 @@ maybeToExcept :: MonadError e m => Maybe a -> e -> m a
 maybeToExcept (Just x) _ = return x
 maybeToExcept Nothing err = throwError err
 
+infixl 5 -:+
+(-:+) :: [a] -> a -> [a]
+(-:+) xs x = xs ++ [x]
+
 runReaderT' :: r -> ReaderT r m a -> m a
 runReaderT' = flip runReaderT
 

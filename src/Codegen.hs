@@ -66,7 +66,7 @@ addGlobalFunction symbol returnType args basicBlocks = do
     AST.basicBlocks = basicBlocks
   }
   defs <- gets AST.moduleDefinitions
-  modify $ \s -> s { AST.moduleDefinitions = defs ++ [def] }
+  modify $ \s -> s { AST.moduleDefinitions = defs -:+ def }
 
 
 --------------------------------------------------------------------------------
@@ -113,7 +113,7 @@ codegenFunction symbolTable args body = evalStateT' emptyFunction $ runReaderT' 
 
   basicBlocks' <- gets _basicBlocks
   currentBasicBlock' <- gets _currentBasicBlock
-  modify $ \s -> s { _basicBlocks = basicBlocks' ++ [currentBasicBlock'] }
+  modify $ \s -> s { _basicBlocks = basicBlocks' -:+ currentBasicBlock' }
 
   basicBlocks'' <- gets _basicBlocks
   mapM basicBlockToLLVMBasicBlock basicBlocks''
@@ -127,7 +127,7 @@ newBasicBlock :: String -> CodegenFunction ()
 newBasicBlock name = do
   basicBlocks' <- gets _basicBlocks
   currentBasicBlock' <- gets _currentBasicBlock
-  modify $ \s -> s { _basicBlocks = basicBlocks' ++ [currentBasicBlock'] }
+  modify $ \s -> s { _basicBlocks = basicBlocks' -:+ currentBasicBlock' }
   modify $ \s -> s { _currentBasicBlock = emptyBasicBlock name }
 
 makeUniqueLabel :: String -> CodegenFunction String
@@ -273,14 +273,14 @@ addNamedInstruction instrType instruction = do
   n <- nextRegisterNumber
   let ref = (AST.UnName n)
   currentBasicBlock' <- gets _currentBasicBlock
-  let currentBasicBlock'' = currentBasicBlock' { _instructions = _instructions currentBasicBlock' ++ [ref := instruction] }
+  let currentBasicBlock'' = currentBasicBlock' { _instructions = _instructions currentBasicBlock' -:+ ref := instruction }
   modify $ \s -> s { _currentBasicBlock = currentBasicBlock'' }
   return $ AST.LocalReference instrType ref
 
 addUnnamedInstruction :: AST.Instruction -> CodegenFunction ()
 addUnnamedInstruction instruction = do
   currentBasicBlock' <- gets _currentBasicBlock
-  let currentBasicBlock'' = currentBasicBlock' { _instructions = _instructions currentBasicBlock' ++ [AST.Do instruction] }
+  let currentBasicBlock'' = currentBasicBlock' { _instructions = _instructions currentBasicBlock' -:+ AST.Do instruction }
   modify $ \s -> s { _currentBasicBlock = currentBasicBlock'' }
 
 nextRegisterNumber :: CodegenFunction Word
