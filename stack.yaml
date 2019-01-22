@@ -1,4 +1,4 @@
-resolver: lts-12.6
+resolver: lts-12.26
 extra-deps:
   - pretty-terminal-0.1.0.0
 flags:
