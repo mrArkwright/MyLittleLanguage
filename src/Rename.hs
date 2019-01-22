@@ -86,9 +86,9 @@ renameModule = renameModule' [] where
 
 
 renameDefinition :: SymbolPath -> Def () -> Rename (Def ())
-renameDefinition modulePath (Function symbol returnType args expr loc) = do
+renameDefinition symbolPath (Function symbol returnType args expr loc) = do
 
-  let symbol' = Symbol (_symbolName symbol) modulePath
+  let symbol' = Symbol (_symbolName symbol) symbolPath
 
   expr' <- renameExpr expr
 

@@ -174,17 +174,17 @@ parseIf = do
 parseCall :: Parser (Expr ())
 parseCall = do
   loc <- sourcePosToLoc <$> getPosition
-  modulePath <- parseModulePath
+  symbolPath <- parseSymbolPath
   name <- L.parseIdentifier
   args <- L.parseParens $ L.parseCommaSep parseExpr
-  let symbol = Symbol name modulePath
+  let symbol = Symbol name symbolPath
   return $ Call symbol args () loc
 
-parseModulePath :: Parser [String]
-parseModulePath = many $ try $ do
-  moduleName <- L.parseIdentifier
+parseSymbolPath :: Parser SymbolPath
+parseSymbolPath = many $ try $ do
+  symbolPath <- L.parseIdentifier
   L.parseDot
-  return moduleName
+  return symbolPath
 
 parseDoBlock :: Parser (Expr ())
 parseDoBlock = do
