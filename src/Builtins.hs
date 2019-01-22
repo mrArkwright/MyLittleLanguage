@@ -3,6 +3,7 @@ module Builtins where
 import Syntax
 
 
+
 builtins :: [FuncDecl]
 builtins = [
     FuncDecl (Symbol "+" []) (FuncSignature TypeInt [TypeInt, TypeInt]),
@@ -14,6 +15,7 @@ builtins = [
     FuncDecl (Symbol "/." []) (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
     FuncDecl (Symbol "<." []) (FuncSignature TypeBoolean [TypeFloat, TypeFloat])
   ]
+
 
 libraryBuiltins :: [FuncDecl]
 libraryBuiltins = [
