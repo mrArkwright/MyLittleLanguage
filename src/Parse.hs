@@ -2,7 +2,6 @@ module Parse (parse) where
 
 import Control.Arrow (left)
 import Control.Monad.Except
-import Control.Monad.Morph
 
 import Data.Functor.Identity
 import Data.Either
@@ -18,8 +17,8 @@ import qualified Lex as L
 import Syntax
 
 
-parse :: Monad m => String -> String -> ExceptT Error m (Module ())
-parse name source = hoist generalize $ liftEither $ left parseErrorToError $ P.parse mainParser name source
+parse :: MonadError Error m => String -> String -> m (Module ())
+parse name source = liftEither $ left parseErrorToError $ P.parse mainParser name source
 
 
 parseErrorToError :: ParseError -> Error

@@ -4,7 +4,6 @@ import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Except
-import Control.Monad.Morph
 
 import qualified Data.Map as M
 
@@ -25,11 +24,8 @@ emptyContext = Context M.empty
 type SymbolTable = M.Map Symbol FuncSignature
 
 
-type Typecheck = StateT Context (ReaderT SymbolTable (Except Error))
-
-
-typecheckProgram :: Monad m => [Def ()] -> ExceptT Error m [Def Type]
-typecheckProgram definitions = hoist generalize $ do
+typecheckProgram :: MonadError Error m => [Def ()] -> m [Def Type]
+typecheckProgram definitions = do
 
   let builtinsSymbolTable = M.fromList $ map (\(FuncDecl symbol signature) -> (symbol, signature)) (builtins ++ libraryBuiltins)
 
@@ -45,7 +41,7 @@ typecheckProgram definitions = hoist generalize $ do
   runReaderT' symbolTable $ mapM (evalStateT' emptyContext . typecheckDef) definitions
 
 
-typecheckDef :: Def () -> Typecheck (Def Type)
+typecheckDef :: (MonadState Context m, MonadReader SymbolTable m, MonadError Error m) => Def () -> m (Def Type)
 typecheckDef (Function symbol defType params expr loc) = do
 
   let params' = map (\(paramName, paramType) -> VarDecl paramName paramType loc) params
@@ -58,7 +54,7 @@ typecheckDef (Function symbol defType params expr loc) = do
   return $ Function symbol defType params typedExpr loc
 
 
-typecheckStatement :: Statement () -> Typecheck (Statement Type, Type)
+typecheckStatement :: (MonadState Context m, MonadReader SymbolTable m, MonadError Error m) => Statement () -> m (Statement Type, Type)
 typecheckStatement (Expr expr () loc) = do
   (typedExpr, exprType) <- typecheckExpr expr
   return $ (Expr typedExpr exprType loc, exprType)
@@ -74,7 +70,7 @@ typecheckStatement (Let name letType expr () loc) = do
   return (Let name letType typedExpr TypeUnit loc, TypeUnit)
 
 
-typecheckExpr :: Expr () -> Typecheck (Expr Type, Type)
+typecheckExpr :: (MonadState Context m, MonadReader SymbolTable m, MonadError Error m) => Expr () -> m (Expr Type, Type)
 typecheckExpr (Unit _ loc) = return (Unit TypeUnit loc, TypeUnit)
 
 typecheckExpr (Int value _ loc) = return (Int value TypeInt loc, TypeInt)
@@ -120,7 +116,7 @@ typecheckExpr (Call symbol exprs _ loc) = do
 
   return (Call symbol typedExprs calleeType loc, calleeType) where
 
-    typecheckParameter :: (Type, Type) -> Typecheck ()
+    typecheckParameter :: (MonadState Context m, MonadReader SymbolTable m, MonadError Error m) => (Type, Type) -> m ()
     typecheckParameter (parameterType, exprType) = when (parameterType /= exprType) $ throwError ("call of function" ++ _symbolName symbol ++ ": expected " ++ show parameterType ++ " but got " ++ show exprType, Just loc)
 
 typecheckExpr (Do statements _ loc) = do
@@ -132,23 +128,23 @@ typecheckExpr (Do statements _ loc) = do
    Nothing -> throwError ("empty do block", Just loc)
 
 
-findDefinition :: Symbol -> Typecheck (Maybe FuncSignature)
+findDefinition :: (MonadState Context m, MonadReader SymbolTable m, MonadError Error m) => Symbol -> m (Maybe FuncSignature)
 findDefinition symbol = do
   symbolTable <- ask
   return $ M.lookup symbol symbolTable
 
 
-findVariable :: Name -> Typecheck (Maybe Type)
+findVariable :: (MonadState Context m, MonadReader SymbolTable m, MonadError Error m) => Name -> m (Maybe Type)
 findVariable name = do
   variables <- getVariables
   return $ M.lookup name variables
 
 
-getVariables :: Typecheck (M.Map Name Type)
+getVariables :: (MonadState Context m, MonadReader SymbolTable m, MonadError Error m) => m (M.Map Name Type)
 getVariables = gets _contextVariables
 
 
-addVariable :: VarDecl -> Typecheck ()
+addVariable :: (MonadState Context m, MonadReader SymbolTable m, MonadError Error m) => VarDecl -> m ()
 addVariable (VarDecl variableName variableType loc) = do
 
   variables <- getVariables

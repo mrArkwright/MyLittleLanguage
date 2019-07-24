@@ -2,7 +2,6 @@ module Rename (rename) where
 
 import Control.Monad.State
 import Control.Monad.Except
-import Control.Monad.Morph
 
 import qualified Data.MultiMap as MM
 
@@ -13,25 +12,23 @@ import Builtins
 
 type SymbolTable = MM.MultiMap Symbol Symbol
 
-type Rename = StateT SymbolTable (Except Error)
 
 
-
-rename :: Monad m => Module () -> ExceptT Error m [Def ()]
-rename module_ = hoist generalize $ evalStateT' MM.empty $ do
+rename :: MonadError Error m => Module () -> m [Def ()]
+rename module_ = evalStateT' MM.empty $ do
   mapM_ importBuiltin (builtins ++ libraryBuiltins)
   importModuleVerbatim module_
   renameModule module_
 
 
-importBuiltin :: FuncDecl -> Rename ()
+importBuiltin :: (MonadState SymbolTable m, MonadError Error m) => FuncDecl -> m ()
 importBuiltin (FuncDecl symbol _) = modify $ MM.insert symbol symbol
 
 
-importModuleVerbatim :: Module () -> Rename ()
+importModuleVerbatim :: (MonadState SymbolTable m, MonadError Error m) => Module () -> m ()
 importModuleVerbatim = importModuleVerbatim' [] where
 
-  importModuleVerbatim' :: SymbolPath -> Module () -> Rename ()
+  importModuleVerbatim' :: (MonadState SymbolTable m, MonadError Error m) => SymbolPath -> Module () -> m ()
   importModuleVerbatim' modulePath (Module moduleName submodules definitions) = do
 
     let modulePath' = modulePath -:+ moduleName
@@ -40,7 +37,7 @@ importModuleVerbatim = importModuleVerbatim' [] where
     mapM_ (importModuleVerbatim' modulePath') submodules
 
 
-importSubmodule :: SymbolPath -> SymbolPath -> Module () -> Rename ()
+importSubmodule :: (MonadState SymbolTable m, MonadError Error m) => SymbolPath -> SymbolPath -> Module () -> m ()
 importSubmodule importPath modulePath (Module moduleName submodules definitions) = do
 
   let modulePath' = modulePath -:+ moduleName
@@ -50,7 +47,7 @@ importSubmodule importPath modulePath (Module moduleName submodules definitions)
   mapM_ (importSubmodule importPath' modulePath') submodules
 
 
-importDefinition :: SymbolPath -> SymbolPath -> Def () -> Rename ()
+importDefinition :: (MonadState SymbolTable m, MonadError Error m) => SymbolPath -> SymbolPath -> Def () -> m ()
 importDefinition importPath symbolPath definition = do
 
   let (FuncDecl (Symbol name _) _) = defToFuncDecl definition
@@ -63,10 +60,10 @@ importDefinition importPath symbolPath definition = do
   modify $ MM.insert importedSymbol symbol
 
 
-renameModule :: Module () -> Rename [Def ()]
+renameModule :: (MonadState SymbolTable m, MonadError Error m) => Module () -> m [Def ()]
 renameModule = renameModule' [] where
 
-  renameModule' :: SymbolPath -> Module () -> Rename [Def ()]
+  renameModule' :: (MonadState SymbolTable m, MonadError Error m) => SymbolPath -> Module () -> m [Def ()]
   renameModule' modulePath (Module moduleName submodules definitions) = do
 
     symbolTableBefore <- get
@@ -85,7 +82,7 @@ renameModule = renameModule' [] where
     return $ renamedDefinitions ++ renamedSubmodulesDefinitions
 
 
-renameDefinition :: SymbolPath -> Def () -> Rename (Def ())
+renameDefinition :: (MonadState SymbolTable m, MonadError Error m) => SymbolPath -> Def () -> m (Def ())
 renameDefinition symbolPath (Function symbol returnType args expr loc) = do
 
   let symbol' = Symbol (_symbolName symbol) symbolPath
@@ -95,7 +92,7 @@ renameDefinition symbolPath (Function symbol returnType args expr loc) = do
   return $ Function symbol' returnType args expr' loc
 
 
-renameExpr :: Expr () -> Rename (Expr ())
+renameExpr :: (MonadState SymbolTable m, MonadError Error m) => Expr () -> m (Expr ())
 renameExpr (If condExpr trueExpr falseExpr tag loc) = do
 
   condExpr' <- renameExpr condExpr
@@ -124,7 +121,7 @@ renameExpr (Call symbol argExprs tag loc) = do
 renameExpr expr = return expr
 
 
-renameStatement :: Statement () -> Rename (Statement ())
+renameStatement :: (MonadState SymbolTable m, MonadError Error m) => Statement () -> m (Statement ())
 renameStatement (Expr expr tag loc) = do
   expr' <- renameExpr expr
   return $ Expr expr' tag loc

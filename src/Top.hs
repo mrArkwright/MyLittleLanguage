@@ -4,10 +4,14 @@ import Data.Maybe
 import Data.List
 
 import Control.Monad.Trans
+import Control.Monad.State
 import Control.Monad.Except
 
 import System.Console.Haskeline
 import System.Console.Pretty
+
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Short as B (fromShort)
 
 import qualified LLVM.AST as AST
 
@@ -36,30 +40,30 @@ defaultOptions = Options {
 -- REPL
 --------------------------------------------------------------------------------
 
-repl :: Options -> IO ()
+repl :: (MonadIO m) => Options -> m ()
 repl options = do
 
-  putStrLn "---- MyLittleLanguage REPL ----"
+  liftIO $ putStrLn "---- MyLittleLanguage REPL ----"
 
   let moduleName = "<stdin>"
   let freshModule = initModule moduleName moduleName
 
-  runInputT defaultSettings $ loop freshModule where
+  liftIO $ runInputT defaultSettings $ loop freshModule where
 
     loop astModule = do
 
-      let moduleName = "<stdin>" -- TODO why is this necessary?
-      minput <- getInputLine "➜ "
+      input <- getInputLine "➜ "
 
-      case minput of
+      case input of
 
         Nothing    -> outputStrLn "Goodbye."
 
         Just ":q"  -> outputStrLn "Goodbye."
 
-        Just input -> do
+        Just input' -> do
 
-          newModule <- liftIO $ runExceptT $ process options moduleName astModule input
+          let moduleName = BC.unpack $ B.fromShort $ AST.moduleName astModule
+          newModule <- runExceptT $ process options moduleName astModule input'
 
           case newModule of
 
@@ -75,10 +79,10 @@ repl options = do
 -- process file
 --------------------------------------------------------------------------------
 
-processFile :: Options -> String -> IO Bool
+processFile :: (MonadIO m) => Options -> String -> m Bool
 processFile options fileName = do
 
-  source <- readFile fileName
+  source <- liftIO $ readFile fileName
 
   let moduleName = init $ dropWhileEnd (/= '.') $ fileName
   let freshModule = initModule moduleName fileName
@@ -89,7 +93,7 @@ processFile options fileName = do
 
     Left (err, loc) -> do
       let locString = fromMaybe "" $ fmap locDescription loc
-      putStrLn $ "[" ++ color Red "error" ++ "] " ++ locString ++ err
+      liftIO $ putStrLn $ "[" ++ color Red "error" ++ "] " ++ locString ++ err
       return False
 
     Right newModule' -> do
@@ -102,12 +106,12 @@ processFile options fileName = do
 -- common
 --------------------------------------------------------------------------------
 
-process :: Options -> String -> AST.Module -> String -> ExceptT Error IO AST.Module
+process :: (MonadError Error m, MonadIO m) => Options -> String -> AST.Module -> String -> m AST.Module
 process options name astModule source = do
 
   parsedModule <- parse name source
 
-  when (_debug options) $ liftIO $ printModule parsedModule
+  when (_debug options) $ printModule parsedModule
 
   renamedDefinitions <- rename parsedModule
 
@@ -116,16 +120,16 @@ process options name astModule source = do
   codegen astModule typedDefinitions
 
 
-printModule :: Show a => Module a -> IO ()
+printModule :: (MonadIO m, Show a) => Module a -> m ()
 printModule module_ = printModule' [] module_ where
 
-  printModule' :: Show a => [String] -> Module a -> IO ()
+  printModule' :: (MonadIO m, Show a) => [String] -> Module a -> m ()
   printModule' modulePath (Module moduleName submodules definitions) = do
 
     let modulePath' = modulePath -:+ moduleName
 
-    putStrLn $ "---- Module \"" ++ intercalate "." modulePath' ++ "\" ----"
+    liftIO $ putStrLn $ "---- Module \"" ++ intercalate "." modulePath' ++ "\" ----"
 
-    mapM_ (putStrLn . (++ "\n") . show) definitions
-    mapM_ (printModule' modulePath') submodules
+    liftIO $ mapM_ (putStrLn . (++ "\n") . show) definitions
+    liftIO $ mapM_ (printModule' modulePath') submodules
 

@@ -4,7 +4,6 @@ module Codegen (initModule, codegen) where
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Except
-import Control.Monad.Morph
 
 import Data.Maybe
 import qualified Data.Map as M
@@ -35,9 +34,6 @@ type SymbolTable = M.Map S.Symbol S.FuncSignature
 -- Modules
 --------------------------------------------------------------------------------
 
-type Codegen = StateT AST.Module (Except Error)
-
-
 initModule :: String -> String -> AST.Module
 initModule name fileName = AST.defaultModule {
     AST.moduleName = B.toShort $ BC.pack name,
@@ -45,28 +41,33 @@ initModule name fileName = AST.defaultModule {
   }
 
 
-codegen :: Monad m => AST.Module -> [(S.Def S.Type)] -> ExceptT Error m AST.Module
-codegen astModule definitions = hoist generalize $ execStateT' astModule $ do
+codegen :: MonadError Error m => AST.Module -> [(S.Def S.Type)] -> m AST.Module
+codegen astModule definitions = evalStateT (codegen' definitions) astModule
 
+
+codegen' :: (MonadState AST.Module m, MonadError Error m) => [(S.Def S.Type)] -> m AST.Module
+codegen' definitions = do
   let functionDeclarations = builtins ++ libraryBuiltins ++ map S.defToFuncDecl definitions
   let symbolTable = M.fromList $ map (\(S.FuncDecl symbol signature) -> (symbol, signature)) functionDeclarations
 
   mapM_ codegenDeclaration libraryBuiltins
   mapM_ (codegenDefinition symbolTable) definitions
 
+  get
 
-codegenDeclaration :: S.FuncDecl -> Codegen ()
+
+codegenDeclaration :: (MonadState AST.Module m, MonadError Error m) => S.FuncDecl -> m ()
 codegenDeclaration (S.FuncDecl symbol (S.FuncSignature returnType args)) = addGlobalFunction symbol returnType namedArgs [] where
   namedArgs = map (\(arg, i) -> ("x" ++ show i, arg)) $ zip args [(1 :: Int)..]
 
 
-codegenDefinition :: SymbolTable -> S.Def S.Type -> Codegen ()
+codegenDefinition :: (MonadState AST.Module m, MonadError Error m) => SymbolTable -> S.Def S.Type -> m ()
 codegenDefinition symbolTable (S.Function symbol returnType args body _) = do
-  basicBlocks <- lift $ codegenFunction symbolTable args body
+  basicBlocks <- codegenFunction symbolTable args body
   addGlobalFunction symbol returnType args basicBlocks
 
 
-addGlobalFunction :: S.Symbol -> S.Type -> [(S.Name, S.Type)] -> [AST.BasicBlock] -> Codegen ()
+addGlobalFunction :: (MonadState AST.Module m, MonadError Error m) => S.Symbol -> S.Type -> [(S.Name, S.Type)] -> [AST.BasicBlock] -> m ()
 addGlobalFunction symbol returnType args basicBlocks = do
 
   let args' = map (\(argName, argType) -> AST.Parameter (typeToType argType) (AST.Name $ B.toShort $ BC.pack $ argName) []) args
@@ -122,10 +123,7 @@ emptyBasicBlock name = BasicBlock {
   }
 
 
-type CodegenFunction = ReaderT SymbolTable (StateT Function (Except Error))
-
-
-codegenFunction :: SymbolTable -> [(S.Name, S.Type)] -> S.Expr S.Type -> Except Error [AST.BasicBlock]
+codegenFunction :: MonadError Error m => SymbolTable -> [(S.Name, S.Type)] -> S.Expr S.Type -> m [AST.BasicBlock]
 codegenFunction symbolTable args body = evalStateT' emptyFunction $ runReaderT' symbolTable $ do
 
   mapM_ addLocalReference args
@@ -140,13 +138,13 @@ codegenFunction symbolTable args body = evalStateT' emptyFunction $ runReaderT' 
   mapM basicBlockToLLVMBasicBlock basicBlocks''
 
 
-basicBlockToLLVMBasicBlock :: BasicBlock -> CodegenFunction AST.BasicBlock
+basicBlockToLLVMBasicBlock :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => BasicBlock -> m AST.BasicBlock
 basicBlockToLLVMBasicBlock (BasicBlock name' instructions' terminator') = do
   terminator'' <- maybeToExcept terminator' ("Block has no terminator: " ++ (show name'), Nothing)
   return $ AST.BasicBlock (AST.Name $ B.toShort $ BC.pack name') instructions' terminator''
 
 
-newBasicBlock :: String -> CodegenFunction ()
+newBasicBlock :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => String -> m ()
 newBasicBlock name = do
 
   basicBlocks' <- gets _basicBlocks
@@ -157,7 +155,7 @@ newBasicBlock name = do
   modify $ \s -> s { _currentBasicBlock = emptyBasicBlock name }
 
 
-makeUniqueLabel :: String -> CodegenFunction String
+makeUniqueLabel :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => String -> m String
 makeUniqueLabel label = do
 
   labels' <- gets _labels
@@ -178,7 +176,7 @@ makeUniqueLabel label = do
 -- Instructions
 --------------------------------------------------------------------------------
 
-codegenExpression :: S.Expr S.Type -> CodegenFunction (Maybe AST.Operand)
+codegenExpression :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => S.Expr S.Type -> m (Maybe AST.Operand)
 codegenExpression (S.Unit _ _) = return Nothing
 
 codegenExpression (S.Int value _ _) = return $ Just $ AST.ConstantOperand $ AST.C.Int 32 value
@@ -271,7 +269,7 @@ codegenExpression (S.Do statements _ _) = do
   return $ last results
 
 
-codegenStatement :: S.Statement S.Type -> CodegenFunction (Maybe AST.Operand)
+codegenStatement :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => S.Statement S.Type -> m (Maybe AST.Operand)
 codegenStatement (S.Expr expression _ _) = codegenExpression expression
 
 codegenStatement (S.Let name _ expression _ _) = do
@@ -283,50 +281,50 @@ codegenStatement (S.Let name _ expression _ _) = do
   return Nothing
 
 
-add :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
+add :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => AST.Operand -> AST.Operand -> m AST.Operand
 add a b = addNamedInstruction integer $ AST.Add False False a b []
 
 
-sub :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
+sub :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => AST.Operand -> AST.Operand -> m AST.Operand
 sub a b = addNamedInstruction integer $ AST.Sub False False a b []
 
 
-icmp :: IPred.IntegerPredicate -> AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
+icmp :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => IPred.IntegerPredicate -> AST.Operand -> AST.Operand -> m AST.Operand
 icmp condition a b = addNamedInstruction integer $ AST.ICmp condition a b []
 
 
-fadd :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
+fadd :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => AST.Operand -> AST.Operand -> m AST.Operand
 fadd a b = addNamedInstruction double $ AST.FAdd AST.noFastMathFlags a b []
 
 
-fsub :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
+fsub :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => AST.Operand -> AST.Operand -> m AST.Operand
 fsub a b = addNamedInstruction double $ AST.FSub AST.noFastMathFlags a b []
 
 
-fmul :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
+fmul :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => AST.Operand -> AST.Operand -> m AST.Operand
 fmul a b = addNamedInstruction double $ AST.FMul AST.noFastMathFlags a b []
 
 
-fdiv :: AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
+fdiv :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => AST.Operand -> AST.Operand -> m AST.Operand
 fdiv a b = addNamedInstruction double $ AST.FDiv AST.noFastMathFlags a b []
 
 
-fcmp :: FPred.FloatingPointPredicate -> AST.Operand -> AST.Operand -> CodegenFunction AST.Operand
+fcmp :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => FPred.FloatingPointPredicate -> AST.Operand -> AST.Operand -> m AST.Operand
 fcmp condition a b = addNamedInstruction integer $ AST.FCmp condition a b []
 
 
-call :: Bool -> AST.Type -> AST.Operand -> [AST.Operand] -> CodegenFunction (Maybe AST.Operand)
+call :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => Bool -> AST.Type -> AST.Operand -> [AST.Operand] -> m (Maybe AST.Operand)
 call named returnType fn args = do
   let callInstruction = AST.Call Nothing AST.C [] (Right fn) [(arg, []) | arg <- args] [] []
   if named then Just <$> (addNamedInstruction returnType callInstruction) else do
     addUnnamedInstruction callInstruction
     return Nothing
 
-br :: String -> CodegenFunction ()
+br :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => String -> m ()
 br label = addTerminator $ AST.Do $ AST.Br (AST.Name $ B.toShort $ BC.pack label) []
 
 
-condBr :: AST.Operand -> String -> String -> CodegenFunction ()
+condBr :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => AST.Operand -> String -> String -> m ()
 condBr condition trueLabel falseLabel =
 
   let trueLabel'  = AST.Name $ B.toShort $ BC.pack trueLabel in
@@ -335,17 +333,17 @@ condBr condition trueLabel falseLabel =
   addTerminator $ AST.Do $ AST.CondBr condition trueLabel' falseLabel' []
 
 
-phi :: AST.Type -> [(AST.Operand, String)] -> CodegenFunction AST.Operand
+phi :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => AST.Type -> [(AST.Operand, String)] -> m AST.Operand
 phi resultType incoming =
   let incoming' = map (\(operand, label) -> (operand, AST.Name $ B.toShort $ BC.pack label)) incoming in
   addNamedInstruction resultType $ AST.Phi resultType incoming' []
 
 
-returnValue :: Maybe AST.Operand -> CodegenFunction ()
+returnValue :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => Maybe AST.Operand -> m ()
 returnValue val = addTerminator $ AST.Do $ AST.Ret val []
 
 
-addNamedInstruction :: AST.Type -> AST.Instruction -> CodegenFunction AST.Operand
+addNamedInstruction :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => AST.Type -> AST.Instruction -> m AST.Operand
 addNamedInstruction instrType instruction = do
 
   n <- nextRegisterNumber
@@ -359,7 +357,7 @@ addNamedInstruction instrType instruction = do
   return $ AST.LocalReference instrType ref
 
 
-addUnnamedInstruction :: AST.Instruction -> CodegenFunction ()
+addUnnamedInstruction :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => AST.Instruction -> m ()
 addUnnamedInstruction instruction = do
 
   currentBasicBlock <- gets _currentBasicBlock
@@ -369,7 +367,7 @@ addUnnamedInstruction instruction = do
   modify $ \s -> s { _currentBasicBlock = currentBasicBlock' }
 
 
-nextRegisterNumber :: CodegenFunction Word
+nextRegisterNumber :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => m Word
 nextRegisterNumber = do
 
   n <- gets _namedInstructionCount
@@ -380,7 +378,7 @@ nextRegisterNumber = do
   return m
 
 
-addTerminator :: AST.Named AST.Terminator -> CodegenFunction ()
+addTerminator :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => AST.Named AST.Terminator -> m ()
 addTerminator trm = do
 
   currentBasicBlock' <- gets _currentBasicBlock
@@ -389,7 +387,7 @@ addTerminator trm = do
   modify $ \s -> s { _currentBasicBlock = currentBasicBlock'' }
 
 
-addLocalReference :: (S.Name, S.Type) -> CodegenFunction AST.Operand
+addLocalReference :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => (S.Name, S.Type) -> m AST.Operand
 addLocalReference (name, argType) = do
 
   let newSymbol = AST.LocalReference (typeToType argType) (AST.Name $ B.toShort $ BC.pack name)
@@ -399,7 +397,7 @@ addLocalReference (name, argType) = do
   return newSymbol
 
 
-getLocalReference :: String -> CodegenFunction (Maybe AST.Operand)
+getLocalReference :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => String -> m (Maybe AST.Operand)
 getLocalReference name = do
   symbols' <- gets _symbols
   return $ M.lookup name symbols'

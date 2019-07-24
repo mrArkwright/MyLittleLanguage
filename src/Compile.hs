@@ -4,6 +4,8 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Short as B (fromShort)
 import qualified Data.ByteString.Char8 as BC
 
+import Control.Monad.Trans
+
 import System.Process
 import System.Directory
 
@@ -17,8 +19,8 @@ import Misc
 
 
 
-compile :: AST.Module -> IO ()
-compile astModule = withContext $ \context -> do
+compile :: (MonadIO m) => AST.Module -> m ()
+compile astModule = liftIO $ withContext $ \context -> do
 
   withModuleFromAST context astModule $ \llvmModule -> do
 
