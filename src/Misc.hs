@@ -37,6 +37,10 @@ infixl 5 -:+
 (-:+) xs x = xs ++ [x]
 
 
+zipWithIndex :: [a] -> [(a, Int)]
+zipWithIndex xs = zip xs [(0 :: Int)..]
+
+
 runReaderT' :: r -> ReaderT r m a -> m a
 runReaderT' = flip runReaderT
 

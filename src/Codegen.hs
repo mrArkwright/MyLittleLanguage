@@ -58,7 +58,7 @@ codegen' definitions = do
 
 codegenDeclaration :: (MonadState AST.Module m, MonadError Error m) => S.FuncDecl -> m ()
 codegenDeclaration (S.FuncDecl symbol (S.FuncSignature returnType args)) = addGlobalFunction symbol returnType namedArgs [] where
-  namedArgs = map (\(arg, i) -> ("x" ++ show i, arg)) $ zip args [(1 :: Int)..]
+  namedArgs = map (\(arg, i) -> ("x" ++ show i, arg)) $ zipWithIndex args
 
 
 codegenDefinition :: (MonadState AST.Module m, MonadError Error m) => SymbolTable -> S.Def S.Type -> m ()
