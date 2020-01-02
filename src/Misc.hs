@@ -77,4 +77,3 @@ parseEither parseA parseB = do
     Nothing -> do
       parsedB <- parseB
       return $ Right parsedB
-

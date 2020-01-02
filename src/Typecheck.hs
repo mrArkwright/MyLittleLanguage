@@ -152,4 +152,3 @@ addVariable (VarDecl variableName variableType loc) = do
   when (M.member variableName variables) $ throwError ("variable redefined: " ++ variableName, Just loc)
 
   modify $ \context -> context { _contextVariables = M.insert variableName variableType variables }
-

@@ -17,6 +17,7 @@ import qualified Lex as L
 import Syntax
 
 
+
 parse :: MonadError Error m => String -> String -> m (Module ())
 parse name source = liftEither $ left parseErrorToError $ P.parse mainParser name source
 
@@ -321,4 +322,3 @@ parseLetStatement = do
 
 sourcePosToLoc :: SourcePos -> Loc
 sourcePosToLoc sourcePos = FileLineLocation (sourceName sourcePos) (sourceLine sourcePos)
-

@@ -41,11 +41,11 @@ initModule name fileName = AST.defaultModule {
   }
 
 
-codegen :: MonadError Error m => AST.Module -> [(S.Def S.Type)] -> m AST.Module
+codegen :: MonadError Error m => AST.Module -> [S.Def S.Type] -> m AST.Module
 codegen astModule definitions = evalStateT (codegen' definitions) astModule
 
 
-codegen' :: (MonadState AST.Module m, MonadError Error m) => [(S.Def S.Type)] -> m AST.Module
+codegen' :: (MonadState AST.Module m, MonadError Error m) => [S.Def S.Type] -> m AST.Module
 codegen' definitions = do
   let functionDeclarations = builtins ++ libraryBuiltins ++ map S.defToFuncDecl definitions
   let symbolTable = M.fromList $ map (\(S.FuncDecl symbol signature) -> (symbol, signature)) functionDeclarations
@@ -70,7 +70,7 @@ codegenDefinition symbolTable (S.Function symbol returnType args body _) = do
 addGlobalFunction :: (MonadState AST.Module m, MonadError Error m) => S.Symbol -> S.Type -> [(S.Name, S.Type)] -> [AST.BasicBlock] -> m ()
 addGlobalFunction symbol returnType args basicBlocks = do
 
-  let args' = map (\(argName, argType) -> AST.Parameter (typeToType argType) (AST.Name $ B.toShort $ BC.pack $ argName) []) args
+  let args' = map (\(argName, argType) -> AST.Parameter (typeToType argType) (AST.Name $ B.toShort $ BC.pack argName) []) args
 
   let def = AST.GlobalDefinition $ AST.functionDefaults {
     AST.name        = AST.Name (B.toShort $ BC.pack $ S.symbolToString symbol),
@@ -140,7 +140,7 @@ codegenFunction symbolTable args body = evalStateT' emptyFunction $ runReaderT' 
 
 basicBlockToLLVMBasicBlock :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => BasicBlock -> m AST.BasicBlock
 basicBlockToLLVMBasicBlock (BasicBlock name' instructions' terminator') = do
-  terminator'' <- maybeToExcept terminator' ("Block has no terminator: " ++ (show name'), Nothing)
+  terminator'' <- maybeToExcept terminator' ("Block has no terminator: " ++ show name', Nothing)
   return $ AST.BasicBlock (AST.Name $ B.toShort $ BC.pack name') instructions' terminator''
 
 
@@ -316,7 +316,7 @@ fcmp condition a b = addNamedInstruction integer $ AST.FCmp condition a b []
 call :: (MonadReader SymbolTable m, MonadState Function m, MonadError Error m) => Bool -> AST.Type -> AST.Operand -> [AST.Operand] -> m (Maybe AST.Operand)
 call named returnType fn args = do
   let callInstruction = AST.Call Nothing AST.C [] (Right fn) [(arg, []) | arg <- args] [] []
-  if named then Just <$> (addNamedInstruction returnType callInstruction) else do
+  if named then Just <$> addNamedInstruction returnType callInstruction else do
     addUnnamedInstruction callInstruction
     return Nothing
 
@@ -347,7 +347,7 @@ addNamedInstruction :: (MonadReader SymbolTable m, MonadState Function m, MonadE
 addNamedInstruction instrType instruction = do
 
   n <- nextRegisterNumber
-  let ref = (AST.UnName n)
+  let ref = AST.UnName n
 
   currentBasicBlock <- gets _currentBasicBlock
   let currentBasicBlock' = currentBasicBlock { _instructions = _instructions currentBasicBlock -:+ ref := instruction }
@@ -416,4 +416,3 @@ integer = AST.IntegerType 32
 
 double :: AST.Type
 double = AST.FloatingPointType AST.DoubleFP
-

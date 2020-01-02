@@ -74,4 +74,3 @@ lexer = Tok.makeTokenParser langDef where
       Tok.reservedNames = reservedNames,
       Tok.reservedOpNames = reservedOpNames
     }
-

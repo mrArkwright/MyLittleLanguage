@@ -5,8 +5,8 @@ import Data.List
 import Misc
 
 
-type Name = String
 
+type Name = String
 
 type SymbolPath = [Name]
 
@@ -76,6 +76,6 @@ defToFuncDecl (Function symbol fType params _ _) =
 
   FuncDecl symbol signature
 
+
 symbolToString :: Symbol -> String
 symbolToString (Symbol symbolName symbolPath) = intercalate "." $ symbolPath -:+ symbolName
-

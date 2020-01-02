@@ -132,4 +132,3 @@ printModule module_ = printModule' [] module_ where
 
     liftIO $ mapM_ (putStrLn . (++ "\n") . show) definitions
     liftIO $ mapM_ (printModule' modulePath') submodules
-
