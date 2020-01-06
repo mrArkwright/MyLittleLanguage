@@ -45,4 +45,4 @@ compile astModule = liftIO $ withContext $ \context ->
       builtinsPath <- getDataFileName "rts/builtins.c"
       callProcess "clang" [builtinsPath, "-c", "-o", inBuildFolder "builtins.o"]
 
-      callProcess "ld" ["-e", "_Main.main", "-demangle", "-dynamic", "-arch", "x86_64", "-macosx_version_min", "10.14.0", "-lSystem", "/usr/local/Cellar/llvm-9/9.0.0/lib/llvm-9/lib/clang/9.0.0/lib/darwin/libclang_rt.osx.a", objectFilePath, inBuildFolder "builtins.o", "-o", inBuildFolder moduleName]
+      callProcess "ld" ["-e", "_Main.main", "-lSystem", objectFilePath, inBuildFolder "builtins.o", "-o", inBuildFolder moduleName]
