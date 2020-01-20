@@ -1,4 +1,4 @@
-module Parse (parse) where
+module Parse.Parse (parse) where
 
 import Control.Arrow (left)
 import Control.Monad.Except
@@ -13,12 +13,12 @@ import Text.Parsec.Expr
 import Text.Parsec.Error
 
 import Misc
-import qualified Lex as L
-import Syntax
+import qualified Parse.Lex as L
+import Parse.Syntax
 
 
 
-parse :: MonadError Error m => String -> String -> m (Module ())
+parse :: MonadError Error m => String -> String -> m Module
 parse name source = liftEither $ left parseErrorToError $ P.parse mainParser name source
 
 
@@ -31,7 +31,7 @@ parseErrorToError parseError =
   (errorMessage, Just loc)
 
 
-mainParser :: Parser (Module ())
+mainParser :: Parser Module
 mainParser = do
 
   L.parseWhiteSpace
@@ -43,13 +43,13 @@ mainParser = do
   return $ Module "Main" modules definitions
 
 
-parseModuleContents :: Parser ([Module ()], [Def ()])
+parseModuleContents :: Parser ([Module], [Definition])
 parseModuleContents = do
   (defs, submodules) <- fmap partitionEithers $ many $ parseEither parseDefinition parseModule
   return $ (submodules, defs)
 
 
-parseModule :: Parser (Module ())
+parseModule :: Parser Module
 parseModule = do
 
   L.parseReserved "module"
@@ -99,43 +99,38 @@ parseFloatType = do
 -- definitions
 --------------------------------------------------------------------------------
 
-parseDefinition :: Parser (Def ())
-parseDefinition = try parseFunction
-
-
-parseFunction :: Parser (Def ())
-parseFunction = do
+parseDefinition :: Parser Definition
+parseDefinition = try $ do
 
   loc <- sourcePosToLoc <$> getPosition
 
-  L.parseReserved "def"
+  L.parseReserved "let"
 
   name <- L.parseIdentifier
-  let symbol = Symbol name []
 
-  args <- L.parseParens $ L.parseCommaSep parseArg
+  parameters <- optionMaybe $ L.parseParens $ L.parseCommaSep parseParameter
 
   L.parseReserved ":"
 
-  functionType <- parseType
+  resultType <- parseType
 
   L.parseReserved "="
 
-  body <- parseExpr
+  expression <- parseExpression
 
-  return $ Function symbol functionType args body loc
+  return $ Definition name parameters resultType expression loc
 
 
-parseArg :: Parser (Name, Type)
-parseArg = do
+parseParameter :: Parser Parameter
+parseParameter = do
 
-  argName <- L.parseIdentifier
+  parameterName <- L.parseIdentifier
 
   L.parseReserved ":"
 
-  argType <- parseType
+  parameterType <- parseType
 
-  return (argName, argType)
+  return $ Parameter parameterName parameterType
 
 
 
@@ -143,22 +138,22 @@ parseArg = do
 -- expressions
 --------------------------------------------------------------------------------
 
-parseExpr :: Parser (Expr ())
-parseExpr = buildExpressionParser operatorTable parseFactor
+parseExpression :: Parser Expression
+parseExpression = buildExpressionParser operatorTable parseFactor
 
 
-parseFactor :: Parser (Expr ())
+parseFactor :: Parser Expression
 parseFactor = try parseUnit
   <|> try parseFloat
   <|> try parseInteger
   <|> try parseCall
-  <|> parseVariable
+  <|> parseSymbolReference
   <|> parseIf
   <|> parseDoBlock
-  <|> L.parseParens parseExpr
+  <|> L.parseParens parseExpression
 
 
-operatorTable :: OperatorTable String () Identity (Expr ())
+operatorTable :: OperatorTable String () Identity Expression
 operatorTable = [
     [binaryOperator "*." AssocLeft, binaryOperator "/." AssocLeft],
     [binaryOperator "+" AssocLeft, binaryOperator "-" AssocLeft, binaryOperator "+." AssocLeft, binaryOperator "-." AssocLeft],
@@ -166,11 +161,11 @@ operatorTable = [
   ]
 
 
-binaryOperator :: String -> Assoc -> Operator String () Identity (Expr ())
+binaryOperator :: String -> Assoc -> Operator String () Identity Expression
 binaryOperator name assoc = Infix (parseBinaryOperator name) assoc
 
 
-parseBinaryOperator :: String -> Parser (Expr () -> Expr () -> Expr ())
+parseBinaryOperator :: String -> Parser (Expression -> Expression -> Expression)
 parseBinaryOperator name = do
 
   loc <- sourcePosToLoc <$> getPosition
@@ -178,66 +173,47 @@ parseBinaryOperator name = do
   L.parseReservedOperator name
 
   let symbol = Symbol name []
-  return $ \x y -> Call symbol [x, y] () loc
+  return $ \x y -> Call symbol [x, y] loc
 
 
-parseUnit :: Parser (Expr ())
+parseUnit :: Parser Expression
 parseUnit = do
 
   loc <- sourcePosToLoc <$> getPosition
 
   L.parseReserved "()"
-  return $ Unit () loc
+  return $ Unit loc
 
 
-parseInteger :: Parser (Expr ())
+parseInteger :: Parser Expression
 parseInteger = do
 
   loc <- sourcePosToLoc <$> getPosition
 
   value <- L.parseInteger
-  return $ Int value () loc
+  return $ Int value loc
 
 
-parseFloat :: Parser (Expr ())
+parseFloat :: Parser Expression
 parseFloat = do
 
   loc <- sourcePosToLoc <$> getPosition
 
   value <- L.parseFloat
-  return $ Float value () loc
+  return $ Float value loc
 
 
-parseVariable :: Parser (Expr ())
-parseVariable = do
+parseSymbolReference :: Parser Expression
+parseSymbolReference = do
 
   loc <- sourcePosToLoc <$> getPosition
 
   name <- L.parseIdentifier
-  return $ Var name () loc
+  let symbol = Symbol name []
+  return $ SymbolReference symbol loc
 
 
-parseIf :: Parser (Expr ())
-parseIf = do
-
-  loc <- sourcePosToLoc <$> getPosition
-
-  L.parseReserved "if"
-
-  condition <- parseExpr
-
-  L.parseReserved "then"
-
-  ifTrue <- parseExpr
-
-  L.parseReserved "else"
-
-  ifFalse <- parseExpr
-
-  return $ If condition ifTrue ifFalse () loc
-
-
-parseCall :: Parser (Expr ())
+parseCall :: Parser Expression
 parseCall = do
 
   loc <- sourcePosToLoc <$> getPosition
@@ -246,10 +222,31 @@ parseCall = do
 
   name <- L.parseIdentifier
 
-  args <- L.parseParens $ L.parseCommaSep parseExpr
+  args <- L.parseParens $ L.parseCommaSep parseExpression
 
   let symbol = Symbol name symbolPath
-  return $ Call symbol args () loc
+  return $ Call symbol args loc
+
+
+parseIf :: Parser Expression
+parseIf = do
+
+  loc <- sourcePosToLoc <$> getPosition
+
+  L.parseReserved "if"
+
+  condition <- parseExpression
+
+  L.parseReserved "then"
+
+  ifTrue <- parseExpression
+
+  L.parseReserved "else"
+
+  ifFalse <- parseExpression
+
+  return $ If condition ifTrue ifFalse loc
+
 
 parseSymbolPath :: Parser SymbolPath
 parseSymbolPath = many $ try $ do
@@ -261,7 +258,7 @@ parseSymbolPath = many $ try $ do
   return symbolPath
 
 
-parseDoBlock :: Parser (Expr ())
+parseDoBlock :: Parser Expression
 parseDoBlock = do
 
   loc <- sourcePosToLoc <$> getPosition
@@ -272,7 +269,7 @@ parseDoBlock = do
 
   L.parseReserved "end"
 
-  return $ Do statements () loc
+  return $ Do statements loc
 
 
 
@@ -280,39 +277,29 @@ parseDoBlock = do
 -- statements
 --------------------------------------------------------------------------------
 
-parseStatement :: Parser (Statement ())
+parseStatement :: Parser Statement
 parseStatement = try parseExpressionStatement
-  <|> parseLetStatement
+  <|> parseDefinitionStatement
 
 
-parseExpressionStatement :: Parser (Statement ())
+parseExpressionStatement :: Parser Statement
 parseExpressionStatement = do
 
   loc <- sourcePosToLoc <$> getPosition
 
-  expression <- parseExpr
+  expression <- parseExpression
 
-  return $ Expr expression () loc
+  return $ StatementExpression expression loc
 
 
-parseLetStatement :: Parser (Statement ())
-parseLetStatement = do
+parseDefinitionStatement :: Parser Statement
+parseDefinitionStatement = do
 
   loc <- sourcePosToLoc <$> getPosition
 
-  L.parseReserved "let"
+  definition <- parseDefinition
 
-  name <- L.parseIdentifier
-
-  L.parseReserved ":"
-
-  letType <- parseType
-
-  L.parseReserved "="
-
-  expression <- parseExpr
-
-  return $ Let name letType expression () loc
+  return $ StatementDefinition definition loc
 
 
 

@@ -1,28 +1,29 @@
 module Builtins where
 
-import Syntax
+import Parse.Syntax
 
 
-builtins :: [FuncDecl]
+
+builtins :: [(Name, Type)]
 builtins = [
-    FuncDecl (Symbol "+" []) (FuncSignature TypeInt [TypeInt, TypeInt]),
-    FuncDecl (Symbol "-" []) (FuncSignature TypeInt [TypeInt, TypeInt]),
-    FuncDecl (Symbol "<" []) (FuncSignature TypeBoolean [TypeInt, TypeInt]),
-    FuncDecl (Symbol "+." []) (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
-    FuncDecl (Symbol "-." []) (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
-    FuncDecl (Symbol "*." []) (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
-    FuncDecl (Symbol "/." []) (FuncSignature TypeFloat [TypeFloat, TypeFloat]),
-    FuncDecl (Symbol "<." []) (FuncSignature TypeBoolean [TypeFloat, TypeFloat])
+    ("+", TypeFunction [TypeInt, TypeInt] TypeInt),
+    ("-", TypeFunction [TypeInt, TypeInt] TypeInt),
+    ("<", TypeFunction [TypeInt, TypeInt] TypeBoolean),
+    ("+.", TypeFunction [TypeFloat, TypeFloat] TypeFloat),
+    ("-.", TypeFunction [TypeFloat, TypeFloat] TypeFloat),
+    ("*.", TypeFunction [TypeFloat, TypeFloat] TypeFloat),
+    ("/.", TypeFunction [TypeFloat, TypeFloat] TypeFloat),
+    ("<.", TypeFunction [TypeFloat, TypeFloat] TypeBoolean)
   ]
 
 
-libraryBuiltins :: [FuncDecl]
+libraryBuiltins :: [(Name, Type)]
 libraryBuiltins = [
-    FuncDecl (Symbol "exitSuccess" []) (FuncSignature TypeUnit []),
-    FuncDecl (Symbol "exitFailure" []) (FuncSignature TypeUnit []),
-    FuncDecl (Symbol "printInt" []) (FuncSignature TypeUnit [TypeInt]),
-    FuncDecl (Symbol "printChar" []) (FuncSignature TypeUnit [TypeInt]),
-    FuncDecl (Symbol "printFloat" []) (FuncSignature TypeUnit [TypeFloat]),
-    FuncDecl (Symbol "sin" []) (FuncSignature TypeFloat [TypeFloat]),
-    FuncDecl (Symbol "sqrt" []) (FuncSignature TypeFloat [TypeFloat])
+    ("exitSuccess", TypeFunction [] TypeUnit),
+    ("exitFailure", TypeFunction [] TypeUnit),
+    ("printInt", TypeFunction [TypeInt] TypeUnit),
+    ("printChar", TypeFunction [TypeInt] TypeUnit),
+    ("printFloat", TypeFunction [TypeFloat] TypeUnit),
+    ("sin", TypeFunction [TypeFloat] TypeFloat),
+    ("sqrt", TypeFunction [TypeFloat] TypeFloat)
   ]

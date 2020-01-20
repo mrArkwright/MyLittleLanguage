@@ -16,11 +16,13 @@ import qualified Data.ByteString.Short as B (fromShort)
 import qualified LLVM.AST as AST
 
 import Misc
-import Syntax
-import Parse
-import Rename
-import Typecheck
-import Codegen
+import Parse.Parse
+import qualified Parse.Syntax as Parse
+import Rename.Rename
+import qualified Rename.Syntax as Rename
+import Typecheck.Typecheck
+import qualified Typecheck.Syntax as Typecheck
+import Codegen.Codegen
 import Compile
 
 
@@ -110,25 +112,40 @@ process :: (MonadError Error m, MonadIO m) => Options -> String -> AST.Module ->
 process options name astModule source = do
 
   parsedModule <- parse name source
-
-  when (_debug options) $ printModule parsedModule
+  when (_debug options) $ printParsed parsedModule
 
   renamedDefinitions <- rename parsedModule
+  when (_debug options) $ printRenamed renamedDefinitions
 
-  typedDefinitions <- typecheckProgram renamedDefinitions
+  typedDefinitions <- typecheck renamedDefinitions
+  when (_debug options) $ printTypechecked typedDefinitions
 
   codegen astModule typedDefinitions
 
 
-printModule :: (MonadIO m, Show a) => Module a -> m ()
-printModule module_ = printModule' [] module_ where
+printParsed :: MonadIO m => Parse.Module -> m ()
+printParsed module_ = do
 
-  printModule' :: (MonadIO m, Show a) => [String] -> Module a -> m ()
-  printModule' modulePath (Module moduleName submodules definitions) = do
+  liftIO $ putStrLn "---- Parsed ----"
+
+  printModule [] module_ where
+
+  printModule :: MonadIO m => [String] -> Parse.Module -> m ()
+  printModule modulePath (Parse.Module moduleName submodules definitions) = do
 
     let modulePath' = modulePath -:+ moduleName
 
-    liftIO $ putStrLn $ "---- Module \"" ++ intercalate "." modulePath' ++ "\" ----"
+    liftIO $ putStrLn $ "- Module " ++ intercalate "." modulePath' ++ ":"
 
     liftIO $ mapM_ (putStrLn . (++ "\n") . show) definitions
-    liftIO $ mapM_ (printModule' modulePath') submodules
+    liftIO $ mapM_ (printModule modulePath') submodules
+
+printRenamed :: MonadIO m => [Rename.GlobalDefinition] -> m ()
+printRenamed definitions = do
+  liftIO $ putStrLn "---- Renamed ----"
+  liftIO $ mapM_ (putStrLn . (++ "\n") . show) definitions
+
+printTypechecked :: MonadIO m => [Typecheck.GlobalDefinition] -> m ()
+printTypechecked definitions = do
+  liftIO $ putStrLn "---- Typecheckd ----"
+  liftIO $ mapM_ (putStrLn . (++ "\n") . show) definitions

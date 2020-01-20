@@ -1,4 +1,4 @@
-module Lex (
+module Parse.Lex (
     parseInteger,
     parseFloat,
     parseParens,
