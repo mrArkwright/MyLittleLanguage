@@ -1,4 +1,8 @@
 .DS_Store
 .stack-work/
 *.cabal
+.idea
+.vscode
 build/
+/MyLittleLanguage.iml
+/stack.yaml.lock
