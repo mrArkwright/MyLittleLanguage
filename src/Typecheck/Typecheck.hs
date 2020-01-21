@@ -98,18 +98,11 @@ typecheckExpression (Rename.Float value loc) = return (Float value TypeFloat loc
 
 typecheckExpression (Rename.SymbolReference symbol loc) = do
 
-{-
-  symbolTable <- get
-  traceM "-------------------- symbolTable"
-  mapM_ traceShowM $ M.toList symbolTable
-  traceM "--------------------"
--}
-
   symbolType <- findSymbol symbol
 
   case symbolType of
     Just symbolType' -> return (SymbolReference symbol symbolType' loc, symbolType')
-    Nothing -> throwError ("(Typecheck) variable \"" ++ show symbol ++ "\" not found", Just loc)
+    Nothing -> throwError ("(Typecheck) symbol \"" ++ show symbol ++ "\" not found", Just loc)
 
 typecheckExpression (Rename.Call symbol arguments loc) = do
 
