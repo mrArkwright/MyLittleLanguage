@@ -9,21 +9,21 @@ import qualified Data.Map as M
 import qualified Data.ByteString.Short as B (toShort)
 import qualified Data.ByteString.Char8 as BC
 
-import qualified LLVM.AST as AST
-import qualified LLVM.AST.Global as AST
-import qualified LLVM.AST.Constant as AST.C
-import qualified LLVM.AST.Float as AST
-import qualified LLVM.AST.FloatingPointPredicate as FPred
-import qualified LLVM.AST.IntegerPredicate as IPred
-import qualified LLVM.AST.CallingConvention as AST
-import qualified LLVM.AST.Type as AST
+import qualified LLVM.AST as LLVM
+import qualified LLVM.AST.Global as LLVM
+import qualified LLVM.AST.Constant as LLVM.Constant
+import qualified LLVM.AST.Float as LLVM
+import qualified LLVM.AST.FloatingPointPredicate as LLVM.FloatingPointPredicate
+import qualified LLVM.AST.IntegerPredicate as LLVM.IntegerPredicate
+import qualified LLVM.AST.CallingConvention as LLVM
+import qualified LLVM.AST.Type as LLVM
 import LLVM.AST.Instruction ( Named( (:=) ) )
 
 import Misc
 import Builtins
-import qualified Parse.Syntax as S (Name, Type(..), Parameter(..))
-import qualified Rename.Syntax as S (Symbol(..), GlobalSymbol(..), LocalSymbol(..))
-import qualified Typecheck.Syntax as S
+import Parse.Syntax (Name, Type(..), Parameter(..))
+import Rename.Syntax (Symbol(..), GlobalSymbol(..), LocalSymbol(..))
+import Typecheck.Syntax
 
 
 
@@ -31,22 +31,22 @@ import qualified Typecheck.Syntax as S
 -- Modules
 --------------------------------------------------------------------------------
 
-type SymbolTable = M.Map S.Symbol S.Type
+type SymbolTable = M.Map Symbol Type
 
 data Codegen = Codegen {
-  codegen_module :: AST.Module,
+  codegen_module :: LLVM.Module,
   codegen_symbolTable :: SymbolTable
 }
 
 
-initModule :: String -> String -> AST.Module
-initModule name fileName = AST.defaultModule {
-    AST.moduleName = B.toShort $ BC.pack name,
-    AST.moduleSourceFileName = B.toShort $ BC.pack fileName
+initModule :: String -> String -> LLVM.Module
+initModule name fileName = LLVM.defaultModule {
+    LLVM.moduleName = B.toShort $ BC.pack name,
+    LLVM.moduleSourceFileName = B.toShort $ BC.pack fileName
   }
 
 
-codegen :: MonadError Error m => AST.Module -> [S.GlobalDefinition] -> m AST.Module
+codegen :: MonadError Error m => LLVM.Module -> [GlobalDefinition] -> m LLVM.Module
 codegen astModule definitions = evalStateT' (Codegen astModule M.empty) $ do
 
   mapM_ importBuiltin $ builtins ++ libraryBuiltins
@@ -58,64 +58,64 @@ codegen astModule definitions = evalStateT' (Codegen astModule M.empty) $ do
   gets codegen_module
 
 
-importBuiltin :: (MonadState Codegen m, MonadError Error m) => (S.Name, S.Type) -> m ()
+importBuiltin :: (MonadState Codegen m, MonadError Error m) => (Name, Type) -> m ()
 importBuiltin (name, type_) = do
   symbolTable <- gets codegen_symbolTable
-  let symbol = S.SymbolGlobal $ S.GlobalSymbol name []
+  let symbol = SymbolGlobal $ GlobalSymbol name []
   modify $ \s -> s { codegen_symbolTable = M.insert symbol type_ symbolTable }
 
 
-importDefinition :: (MonadState Codegen m, MonadError Error m) => S.GlobalDefinition -> m ()
+importDefinition :: (MonadState Codegen m, MonadError Error m) => GlobalDefinition -> m ()
 importDefinition definition = do
   symbolTable <- gets codegen_symbolTable
-  let symbol = S.SymbolGlobal $ S.globalDefinitionSymbol definition
-  let type_ = S.globalDefinitionType definition
+  let symbol = SymbolGlobal $ globalDefinitionSymbol definition
+  let type_ = globalDefinitionType definition
   modify $ \s -> s { codegen_symbolTable = M.insert symbol type_ symbolTable }
 
 
-codegenLibraryBuiltin :: (MonadState Codegen m, MonadError Error m) => (S.Name, S.Type) -> m ()
+codegenLibraryBuiltin :: (MonadState Codegen m, MonadError Error m) => (Name, Type) -> m ()
 codegenLibraryBuiltin (name, type_) = case type_ of
 
-  S.TypeFunction parameterTypes resultType -> do
-    let namedParameters = map (\(parameterType, i) -> S.Parameter ("x" ++ show i) parameterType) $ zipWithIndex parameterTypes
-    addGlobalFunction (S.GlobalSymbol name []) namedParameters resultType []
+  TypeFunction parameterTypes resultType -> do
+    let namedParameters = map (\(parameterType, i) -> Parameter ("x" ++ show i) parameterType) $ zipWithIndex parameterTypes
+    addGlobalFunction (GlobalSymbol name []) namedParameters resultType []
 
   _ -> throwError ("(Codegen) codegenLibraryBuiltin not implemented for type" ++ show type_, Nothing)
 
 
-codegenGlobalDefinition :: (MonadState Codegen m, MonadError Error m) => S.GlobalDefinition -> m ()
-codegenGlobalDefinition (S.GlobalDefinitionValue definition) = do
-  throwError ("(Codegen) codegenDefinition not implemented for global values.", Just $ S.globalValueDefinition_loc definition)
+codegenGlobalDefinition :: (MonadState Codegen m, MonadError Error m) => GlobalDefinition -> m ()
+codegenGlobalDefinition (GlobalDefinitionValue definition) = do
+  throwError ("(Codegen) codegenDefinition not implemented for global values.", Just $ globalValueDefinition_loc definition)
 
-codegenGlobalDefinition (S.GlobalDefinitionFunction definition) = do
+codegenGlobalDefinition (GlobalDefinitionFunction definition) = do
 
   symbolTable <- gets codegen_symbolTable
 
-  let symbol = S.functionDefinition_symbol definition
-  let parameters = S.functionDefinition_parameters definition
-  let expression = S.functionDefinition_expression definition
-  let resultType = S.functionDefinition_resultType definition
+  let symbol = functionDefinition_symbol definition
+  let parameters = functionDefinition_parameters definition
+  let expression = functionDefinition_expression definition
+  let resultType = functionDefinition_resultType definition
 
   basicBlocks <- codegenFunction symbolTable parameters expression
   addGlobalFunction symbol parameters resultType basicBlocks
 
 
-addGlobalFunction :: (MonadState Codegen m, MonadError Error m) => S.GlobalSymbol -> [S.Parameter] -> S.Type -> [AST.BasicBlock] -> m ()
+addGlobalFunction :: (MonadState Codegen m, MonadError Error m) => GlobalSymbol -> [Parameter] -> Type -> [LLVM.BasicBlock] -> m ()
 addGlobalFunction symbol parameters resultType basicBlocks = do
 
-  let parameters' = map (\parameter -> AST.Parameter (typeToType $ S.parameter_type parameter) (AST.Name $ B.toShort $ BC.pack $ S.parameter_name parameter) []) parameters
+  let parameters' = map (\parameter -> LLVM.Parameter (typeToType $ parameter_type parameter) (LLVM.Name $ B.toShort $ BC.pack $ parameter_name parameter) []) parameters
 
-  let llvmDefinition = AST.GlobalDefinition $ AST.functionDefaults {
-    AST.name        = AST.Name (B.toShort $ BC.pack $ show symbol),
-    AST.parameters  = (parameters', False),
-    AST.returnType  = typeToType resultType,
-    AST.basicBlocks = basicBlocks
+  let llvmDefinition = LLVM.GlobalDefinition $ LLVM.functionDefaults {
+    LLVM.name        = LLVM.Name (B.toShort $ BC.pack $ show symbol),
+    LLVM.parameters  = (parameters', False),
+    LLVM.returnType  = typeToType resultType,
+    LLVM.basicBlocks = basicBlocks
   }
 
   llvmModule <- gets codegen_module
-  let llvmModuleDefinitions = AST.moduleDefinitions llvmModule
+  let llvmModuleDefinitions = LLVM.moduleDefinitions llvmModule
 
-  modify $ \s -> s { codegen_module = llvmModule { AST.moduleDefinitions = llvmModuleDefinitions -:+ llvmDefinition } }
+  modify $ \s -> s { codegen_module = llvmModule { LLVM.moduleDefinitions = llvmModuleDefinitions -:+ llvmDefinition } }
 
 
 
@@ -127,7 +127,7 @@ data CodegenFunction = CodegenFunction {
     codegenFunction_symbolTable           :: SymbolTable,
     codegenFunction_currentBasicBlock     :: BasicBlock,
     codegenFunction_basicBlocks           :: [BasicBlock],
-    codegenFunction_symbols               :: M.Map String AST.Operand,
+    codegenFunction_symbols               :: M.Map String LLVM.Operand,
     codegenFunction_namedInstructionCount :: Word,
     codegenFunction_labels                :: M.Map String Int
   } deriving Show
@@ -146,8 +146,8 @@ newCodegenFunction symbolTable = CodegenFunction {
 
 data BasicBlock = BasicBlock {
     basicBlock_name         :: String,
-    basicBlock_instructions :: [AST.Named AST.Instruction],
-    basicBlock_terminator   :: Maybe (AST.Named AST.Terminator)
+    basicBlock_instructions :: [LLVM.Named LLVM.Instruction],
+    basicBlock_terminator   :: Maybe (LLVM.Named LLVM.Terminator)
   } deriving Show
 
 
@@ -159,7 +159,7 @@ newBasicBlock name = BasicBlock {
   }
 
 
-codegenFunction :: MonadError Error m => SymbolTable -> [S.Parameter] -> S.Expression -> m [AST.BasicBlock]
+codegenFunction :: MonadError Error m => SymbolTable -> [Parameter] -> Expression -> m [LLVM.BasicBlock]
 codegenFunction symbolTable parameters expression = evalStateT' (newCodegenFunction symbolTable) $ do
 
   mapM_ addParameter parameters
@@ -174,10 +174,10 @@ codegenFunction symbolTable parameters expression = evalStateT' (newCodegenFunct
   mapM basicBlockToLLVMBasicBlock basicBlocks'
 
 
-basicBlockToLLVMBasicBlock :: (MonadState CodegenFunction m, MonadError Error m) => BasicBlock -> m AST.BasicBlock
+basicBlockToLLVMBasicBlock :: (MonadState CodegenFunction m, MonadError Error m) => BasicBlock -> m LLVM.BasicBlock
 basicBlockToLLVMBasicBlock (BasicBlock name instructions terminator) = do
   terminator' <- maybeToError terminator ("(Codegen) Block has no terminator: " ++ (show name), Nothing)
-  return $ AST.BasicBlock (AST.Name $ B.toShort $ BC.pack name) instructions terminator'
+  return $ LLVM.BasicBlock (LLVM.Name $ B.toShort $ BC.pack name) instructions terminator'
 
 
 addNewBasicBlock :: (MonadState CodegenFunction m, MonadError Error m) => String -> m ()
@@ -211,74 +211,74 @@ makeUniqueLabel label = do
 -- Instructions
 --------------------------------------------------------------------------------
 
-codegenExpression :: (MonadState CodegenFunction m, MonadError Error m) => S.Expression -> m (Maybe AST.Operand)
-codegenExpression (S.Unit _ _) = return Nothing
+codegenExpression :: (MonadState CodegenFunction m, MonadError Error m) => Expression -> m (Maybe LLVM.Operand)
+codegenExpression (Unit _ _) = return Nothing
 
-codegenExpression (S.Int value _ _) = return $ Just $ AST.ConstantOperand $ AST.C.Int 32 value
+codegenExpression (Int value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.Constant.Int 32 value
 
-codegenExpression (S.Float value _ _) = return $ Just $ AST.ConstantOperand $ AST.C.Float (AST.Double value)
+codegenExpression (Float value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.Constant.Float (LLVM.Double value)
 
-codegenExpression (S.SymbolReference (S.SymbolLocal symbol) _ loc) = do
-  reference <- getLocalReference $ S.localSymbol_name symbol
-  reference' <- maybeToError reference ("(Codegen) reference to unkown symbol: " ++ S.localSymbol_name symbol, Just loc)
+codegenExpression (SymbolReference (SymbolLocal symbol) _ loc) = do
+  reference <- getLocalReference $ localSymbol_name symbol
+  reference' <- maybeToError reference ("(Codegen) reference to unkown symbol: " ++ localSymbol_name symbol, Just loc)
   return $ Just reference'
 
-codegenExpression (S.SymbolReference (S.SymbolGlobal symbol) _ loc) = do
+codegenExpression (SymbolReference (SymbolGlobal symbol) _ loc) = do
   throwError ("(Codegen) codegen not implemented for global symbols (symbol: " ++ show symbol ++ ")", Just loc)
 
-codegenExpression (S.Call symbol argExprs _ loc) = do
+codegenExpression (Call symbol argExprs _ loc) = do
 
   args <- map fromJust <$> mapM codegenExpression argExprs
 
   case symbol of
 
-    S.SymbolGlobal (S.GlobalSymbol "+" []) -> do
+    SymbolGlobal (GlobalSymbol "+" []) -> do
       let [a, b] = args -- TODO proper error
       Just <$> add a b
 
-    S.SymbolGlobal (S.GlobalSymbol "-" []) -> do
+    SymbolGlobal (GlobalSymbol "-" []) -> do
       let [a, b] = args
       Just <$> sub a b
 
-    S.SymbolGlobal (S.GlobalSymbol "<" []) -> do
+    SymbolGlobal (GlobalSymbol "<" []) -> do
       let [a, b] = args
-      Just <$> icmp IPred.SLT a b
+      Just <$> icmp LLVM.IntegerPredicate.SLT a b
 
-    S.SymbolGlobal (S.GlobalSymbol "+." []) -> do
+    SymbolGlobal (GlobalSymbol "+." []) -> do
       let [a, b] = args
       Just <$> fadd a b
 
-    S.SymbolGlobal (S.GlobalSymbol "-." []) -> do
+    SymbolGlobal (GlobalSymbol "-." []) -> do
       let [a, b] = args
       Just <$> fsub a b
 
-    S.SymbolGlobal (S.GlobalSymbol "*." []) -> do
+    SymbolGlobal (GlobalSymbol "*." []) -> do
       let [a, b] = args
       Just <$> fmul a b
 
-    S.SymbolGlobal (S.GlobalSymbol "/." []) -> do
+    SymbolGlobal (GlobalSymbol "/." []) -> do
       let [a, b] = args
       Just <$> fdiv a b
 
-    S.SymbolGlobal (S.GlobalSymbol "<." []) -> do
+    SymbolGlobal (GlobalSymbol "<." []) -> do
       let [a, b] = args
-      Just <$> fcmp FPred.ULT a b
+      Just <$> fcmp LLVM.FloatingPointPredicate.ULT a b
 
     _  -> do
 
       symbolTable <- gets codegenFunction_symbolTable
 
       (parameterTypes, resultType) <- case M.lookup symbol symbolTable of
-        Just (S.TypeFunction parameterTypes' resultType') -> return (parameterTypes', resultType')
+        Just (TypeFunction parameterTypes' resultType') -> return (parameterTypes', resultType')
         _ -> throwError ("(Codegen) Call to unknown symbol: " ++ show symbol, Just loc)
 
-      let functionType = AST.ptr $ AST.FunctionType (typeToType resultType) (map typeToType parameterTypes) False
-      let (S.SymbolGlobal symbol') = symbol
-      let function = AST.ConstantOperand $ AST.C.GlobalReference functionType (AST.Name $ B.toShort $ BC.pack $ show symbol')
+      let functionType = LLVM.ptr $ LLVM.FunctionType (typeToType resultType) (map typeToType parameterTypes) False
+      let (SymbolGlobal symbol') = symbol
+      let function = LLVM.ConstantOperand $ LLVM.Constant.GlobalReference functionType (LLVM.Name $ B.toShort $ BC.pack $ show symbol')
 
-      call (resultType /= S.TypeUnit) (typeToType resultType) function args
+      call (resultType /= TypeUnit) (typeToType resultType) function args
 
-codegenExpression (S.If condition ifTrue ifFalse ifType loc) = do
+codegenExpression (If condition ifTrue ifFalse ifType loc) = do
 
   thenLabel <- makeUniqueLabel "if.then"
   elseLabel <- makeUniqueLabel "if.else"
@@ -308,107 +308,107 @@ codegenExpression (S.If condition ifTrue ifFalse ifType loc) = do
     _ -> throwError ("(Codegen) error", Just loc) -- TODO proper error message
 
 
-codegenExpression (S.Do statements _ _) = do
+codegenExpression (Do statements _ _) = do
   results <- mapM codegenStatement statements
   return $ last results
 
 
-codegenStatement :: (MonadState CodegenFunction m, MonadError Error m) => S.Statement -> m (Maybe AST.Operand)
-codegenStatement (S.StatementExpression expression _ _) = codegenExpression expression
+codegenStatement :: (MonadState CodegenFunction m, MonadError Error m) => Statement -> m (Maybe LLVM.Operand)
+codegenStatement (StatementExpression expression _ _) = codegenExpression expression
 
-codegenStatement (S.StatementDefinition definition _ _) = do
+codegenStatement (StatementDefinition definition _ _) = do
 
-  result <- fromJust <$> codegenExpression (S.localValueDefinition_expression definition)
+  result <- fromJust <$> codegenExpression (localValueDefinition_expression definition)
 
-  let symbol = S.localValueDefinition_symbol definition
-  let name = S.localSymbol_name symbol
+  let symbol = localValueDefinition_symbol definition
+  let name = localSymbol_name symbol
   modify $ \s -> s { codegenFunction_symbols = M.insert name result (codegenFunction_symbols s) }
 
   return Nothing
 
 
-add :: (MonadState CodegenFunction m, MonadError Error m) => AST.Operand -> AST.Operand -> m AST.Operand
-add a b = addNamedInstruction integer $ AST.Add False False a b []
+add :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Operand -> LLVM.Operand -> m LLVM.Operand
+add a b = addNamedInstruction integer $ LLVM.Add False False a b []
 
 
-sub :: (MonadState CodegenFunction m, MonadError Error m) => AST.Operand -> AST.Operand -> m AST.Operand
-sub a b = addNamedInstruction integer $ AST.Sub False False a b []
+sub :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Operand -> LLVM.Operand -> m LLVM.Operand
+sub a b = addNamedInstruction integer $ LLVM.Sub False False a b []
 
 
-icmp :: (MonadState CodegenFunction m, MonadError Error m) => IPred.IntegerPredicate -> AST.Operand -> AST.Operand -> m AST.Operand
-icmp condition a b = addNamedInstruction integer $ AST.ICmp condition a b []
+icmp :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.IntegerPredicate.IntegerPredicate -> LLVM.Operand -> LLVM.Operand -> m LLVM.Operand
+icmp condition a b = addNamedInstruction integer $ LLVM.ICmp condition a b []
 
 
-fadd :: (MonadState CodegenFunction m, MonadError Error m) => AST.Operand -> AST.Operand -> m AST.Operand
-fadd a b = addNamedInstruction double $ AST.FAdd AST.noFastMathFlags a b []
+fadd :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Operand -> LLVM.Operand -> m LLVM.Operand
+fadd a b = addNamedInstruction double $ LLVM.FAdd LLVM.noFastMathFlags a b []
 
 
-fsub :: (MonadState CodegenFunction m, MonadError Error m) => AST.Operand -> AST.Operand -> m AST.Operand
-fsub a b = addNamedInstruction double $ AST.FSub AST.noFastMathFlags a b []
+fsub :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Operand -> LLVM.Operand -> m LLVM.Operand
+fsub a b = addNamedInstruction double $ LLVM.FSub LLVM.noFastMathFlags a b []
 
 
-fmul :: (MonadState CodegenFunction m, MonadError Error m) => AST.Operand -> AST.Operand -> m AST.Operand
-fmul a b = addNamedInstruction double $ AST.FMul AST.noFastMathFlags a b []
+fmul :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Operand -> LLVM.Operand -> m LLVM.Operand
+fmul a b = addNamedInstruction double $ LLVM.FMul LLVM.noFastMathFlags a b []
 
 
-fdiv :: (MonadState CodegenFunction m, MonadError Error m) => AST.Operand -> AST.Operand -> m AST.Operand
-fdiv a b = addNamedInstruction double $ AST.FDiv AST.noFastMathFlags a b []
+fdiv :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Operand -> LLVM.Operand -> m LLVM.Operand
+fdiv a b = addNamedInstruction double $ LLVM.FDiv LLVM.noFastMathFlags a b []
 
 
-fcmp :: (MonadState CodegenFunction m, MonadError Error m) => FPred.FloatingPointPredicate -> AST.Operand -> AST.Operand -> m AST.Operand
-fcmp condition a b = addNamedInstruction integer $ AST.FCmp condition a b []
+fcmp :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.FloatingPointPredicate.FloatingPointPredicate -> LLVM.Operand -> LLVM.Operand -> m LLVM.Operand
+fcmp condition a b = addNamedInstruction integer $ LLVM.FCmp condition a b []
 
 
-call :: (MonadState CodegenFunction m, MonadError Error m) => Bool -> AST.Type -> AST.Operand -> [AST.Operand] -> m (Maybe AST.Operand)
+call :: (MonadState CodegenFunction m, MonadError Error m) => Bool -> LLVM.Type -> LLVM.Operand -> [LLVM.Operand] -> m (Maybe LLVM.Operand)
 call named returnType fn args = do
-  let callInstruction = AST.Call Nothing AST.C [] (Right fn) [(arg, []) | arg <- args] [] []
+  let callInstruction = LLVM.Call Nothing LLVM.C [] (Right fn) [(arg, []) | arg <- args] [] []
   if named then Just <$> (addNamedInstruction returnType callInstruction) else do
     addUnnamedInstruction callInstruction
     return Nothing
 
 br :: (MonadState CodegenFunction m, MonadError Error m) => String -> m ()
-br label = addTerminator $ AST.Do $ AST.Br (AST.Name $ B.toShort $ BC.pack label) []
+br label = addTerminator $ LLVM.Do $ LLVM.Br (LLVM.Name $ B.toShort $ BC.pack label) []
 
 
-condBr :: (MonadState CodegenFunction m, MonadError Error m) => AST.Operand -> String -> String -> m ()
+condBr :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Operand -> String -> String -> m ()
 condBr condition trueLabel falseLabel =
 
-  let trueLabel'  = AST.Name $ B.toShort $ BC.pack trueLabel in
-  let falseLabel' = AST.Name $ B.toShort $ BC.pack falseLabel in
+  let trueLabel'  = LLVM.Name $ B.toShort $ BC.pack trueLabel in
+  let falseLabel' = LLVM.Name $ B.toShort $ BC.pack falseLabel in
 
-  addTerminator $ AST.Do $ AST.CondBr condition trueLabel' falseLabel' []
+  addTerminator $ LLVM.Do $ LLVM.CondBr condition trueLabel' falseLabel' []
 
 
-phi :: (MonadState CodegenFunction m, MonadError Error m) => AST.Type -> [(AST.Operand, String)] -> m AST.Operand
+phi :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Type -> [(LLVM.Operand, String)] -> m LLVM.Operand
 phi resultType incoming =
-  let incoming' = map (\(operand, label) -> (operand, AST.Name $ B.toShort $ BC.pack label)) incoming in
-  addNamedInstruction resultType $ AST.Phi resultType incoming' []
+  let incoming' = map (\(operand, label) -> (operand, LLVM.Name $ B.toShort $ BC.pack label)) incoming in
+  addNamedInstruction resultType $ LLVM.Phi resultType incoming' []
 
 
-returnValue :: (MonadState CodegenFunction m, MonadError Error m) => Maybe AST.Operand -> m ()
-returnValue val = addTerminator $ AST.Do $ AST.Ret val []
+returnValue :: (MonadState CodegenFunction m, MonadError Error m) => Maybe LLVM.Operand -> m ()
+returnValue val = addTerminator $ LLVM.Do $ LLVM.Ret val []
 
 
-addNamedInstruction :: (MonadState CodegenFunction m, MonadError Error m) => AST.Type -> AST.Instruction -> m AST.Operand
+addNamedInstruction :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Type -> LLVM.Instruction -> m LLVM.Operand
 addNamedInstruction instrType instruction = do
 
   n <- nextRegisterNumber
-  let ref = (AST.UnName n)
+  let ref = (LLVM.UnName n)
 
   currentBasicBlock <- gets codegenFunction_currentBasicBlock
   let currentBasicBlock' = currentBasicBlock { basicBlock_instructions = basicBlock_instructions currentBasicBlock -:+ ref := instruction }
 
   modify $ \s -> s { codegenFunction_currentBasicBlock = currentBasicBlock' }
 
-  return $ AST.LocalReference instrType ref
+  return $ LLVM.LocalReference instrType ref
 
 
-addUnnamedInstruction :: (MonadState CodegenFunction m, MonadError Error m) => AST.Instruction -> m ()
+addUnnamedInstruction :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Instruction -> m ()
 addUnnamedInstruction instruction = do
 
   currentBasicBlock <- gets codegenFunction_currentBasicBlock
 
-  let currentBasicBlock' = currentBasicBlock { basicBlock_instructions = basicBlock_instructions currentBasicBlock -:+ AST.Do instruction }
+  let currentBasicBlock' = currentBasicBlock { basicBlock_instructions = basicBlock_instructions currentBasicBlock -:+ LLVM.Do instruction }
 
   modify $ \s -> s { codegenFunction_currentBasicBlock = currentBasicBlock' }
 
@@ -424,7 +424,7 @@ nextRegisterNumber = do
   return m
 
 
-addTerminator :: (MonadState CodegenFunction m, MonadError Error m) => AST.Named AST.Terminator -> m ()
+addTerminator :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Named LLVM.Terminator -> m ()
 addTerminator trm = do
 
   currentBasicBlock' <- gets codegenFunction_currentBasicBlock
@@ -433,42 +433,42 @@ addTerminator trm = do
   modify $ \s -> s { codegenFunction_currentBasicBlock = currentBasicBlock'' }
 
 
-addParameter :: (MonadState CodegenFunction m, MonadError Error m) => S.Parameter -> m AST.Operand
+addParameter :: (MonadState CodegenFunction m, MonadError Error m) => Parameter -> m LLVM.Operand
 addParameter parameter = do
-  let symbol = S.SymbolLocal $ S.LocalSymbol (S.parameter_name parameter)
-  modify $ \s -> s { codegenFunction_symbolTable = M.insert symbol (S.parameter_type parameter) (codegenFunction_symbolTable s) }
-  addLocalReference (S.parameter_name parameter, S.parameter_type parameter)
+  let symbol = SymbolLocal $ LocalSymbol (parameter_name parameter)
+  modify $ \s -> s { codegenFunction_symbolTable = M.insert symbol (parameter_type parameter) (codegenFunction_symbolTable s) }
+  addLocalReference (parameter_name parameter, parameter_type parameter)
 
 
 
-addLocalReference :: (MonadState CodegenFunction m, MonadError Error m) => (S.Name, S.Type) -> m AST.Operand
+addLocalReference :: (MonadState CodegenFunction m, MonadError Error m) => (Name, Type) -> m LLVM.Operand
 addLocalReference (name, argType) = do
 
-  let newSymbol = AST.LocalReference (typeToType argType) (AST.Name $ B.toShort $ BC.pack name)
+  let newSymbol = LLVM.LocalReference (typeToType argType) (LLVM.Name $ B.toShort $ BC.pack name)
 
   modify $ \s -> s { codegenFunction_symbols = M.insert name newSymbol (codegenFunction_symbols s) }
 
   return newSymbol
 
 
-getLocalReference :: (MonadState CodegenFunction m, MonadError Error m) => String -> m (Maybe AST.Operand)
+getLocalReference :: (MonadState CodegenFunction m, MonadError Error m) => String -> m (Maybe LLVM.Operand)
 getLocalReference name = do
   symbols' <- gets codegenFunction_symbols
   return $ M.lookup name symbols'
 
 
-typeToType :: S.Type -> AST.Type
-typeToType S.TypeUnit = AST.VoidType
-typeToType S.TypeFloat = double
-typeToType S.TypeInt = integer
-typeToType (S.TypeFunction parameterTypes resultType) = AST.ptr $ AST.FunctionType (typeToType resultType) (map typeToType parameterTypes) False
+typeToType :: Type -> LLVM.Type
+typeToType TypeUnit = LLVM.VoidType
+typeToType TypeFloat = double
+typeToType TypeInt = integer
+typeToType (TypeFunction parameterTypes resultType) = LLVM.ptr $ LLVM.FunctionType (typeToType resultType) (map typeToType parameterTypes) False
 typeToType t = error $ "type not implemented: " ++ show t
 
 
-integer :: AST.Type
-integer = AST.IntegerType 32
+integer :: LLVM.Type
+integer = LLVM.IntegerType 32
 
 
-double :: AST.Type
-double = AST.FloatingPointType AST.DoubleFP
+double :: LLVM.Type
+double = LLVM.FloatingPointType LLVM.DoubleFP
 
