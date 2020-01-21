@@ -13,8 +13,8 @@ import Text.Parsec.Expr
 import Text.Parsec.Error
 
 import Misc
-import qualified Parse.Lex as L
 import Parse.Syntax
+import qualified Parse.Lex as Lex
 
 
 
@@ -34,7 +34,7 @@ parseErrorToError parseError =
 mainParser :: Parser Module
 mainParser = do
 
-  L.parseWhiteSpace
+  Lex.parseWhiteSpace
 
   (modules, definitions) <- parseModuleContents
 
@@ -52,15 +52,15 @@ parseModuleContents = do
 parseModule :: Parser Module
 parseModule = do
 
-  L.parseReserved "module"
+  Lex.parseReserved "module"
 
-  moduleName <- L.parseIdentifier
+  moduleName <- Lex.parseIdentifier
 
-  L.parseReserved "begin"
+  Lex.parseReserved "begin"
 
   (submodules, defs) <- parseModuleContents
 
-  L.parseReserved "end"
+  Lex.parseReserved "end"
 
   return $ Module moduleName submodules defs
 
@@ -79,26 +79,26 @@ parseType = parseUnitType
 
 parseUnitType :: Parser Type
 parseUnitType = do
-  L.parseReserved "Unit"
+  Lex.parseReserved "Unit"
   return TypeUnit
 
 
 parseIntType :: Parser Type
 parseIntType = do
-  L.parseReserved "Int"
+  Lex.parseReserved "Int"
   return TypeInt
 
 
 parseFloatType :: Parser Type
 parseFloatType = do
-  L.parseReserved "Float"
+  Lex.parseReserved "Float"
   return TypeFloat
 
 
 parseFunctionType :: Parser Type
 parseFunctionType = do
-  parameterTypes <- L.parseParens $ L.parseCommaSep parseType
-  L.parseReserved "->"
+  parameterTypes <- Lex.parseParens $ Lex.parseCommaSep parseType
+  Lex.parseReserved "->"
   returnType <- parseType
   return $ TypeFunction parameterTypes returnType
 
@@ -113,17 +113,17 @@ parseDefinition = try $ do
 
   loc <- sourcePosToLoc <$> getPosition
 
-  L.parseReserved "let"
+  Lex.parseReserved "let"
 
-  name <- L.parseIdentifier
+  name <- Lex.parseIdentifier
 
-  parameters <- optionMaybe $ L.parseParens $ L.parseCommaSep parseParameter
+  parameters <- optionMaybe $ Lex.parseParens $ Lex.parseCommaSep parseParameter
 
-  L.parseReserved ":"
+  Lex.parseReserved ":"
 
   resultType <- parseType
 
-  L.parseReserved "="
+  Lex.parseReserved "="
 
   expression <- parseExpression
 
@@ -133,9 +133,9 @@ parseDefinition = try $ do
 parseParameter :: Parser Parameter
 parseParameter = do
 
-  parameterName <- L.parseIdentifier
+  parameterName <- Lex.parseIdentifier
 
-  L.parseReserved ":"
+  Lex.parseReserved ":"
 
   parameterType <- parseType
 
@@ -159,7 +159,7 @@ parseFactor = try parseUnit
   <|> parseSymbolReference
   <|> parseIf
   <|> parseDoBlock
-  <|> L.parseParens parseExpression
+  <|> Lex.parseParens parseExpression
 
 
 operatorTable :: OperatorTable String () Identity Expression
@@ -179,7 +179,7 @@ parseBinaryOperator name = do
 
   loc <- sourcePosToLoc <$> getPosition
 
-  L.parseReservedOperator name
+  Lex.parseReservedOperator name
 
   let symbol = Symbol name []
   return $ \x y -> Call symbol [x, y] loc
@@ -190,7 +190,7 @@ parseUnit = do
 
   loc <- sourcePosToLoc <$> getPosition
 
-  L.parseReserved "()"
+  Lex.parseReserved "()"
   return $ Unit loc
 
 
@@ -199,7 +199,7 @@ parseInteger = do
 
   loc <- sourcePosToLoc <$> getPosition
 
-  value <- L.parseInteger
+  value <- Lex.parseInteger
   return $ Int value loc
 
 
@@ -208,7 +208,7 @@ parseFloat = do
 
   loc <- sourcePosToLoc <$> getPosition
 
-  value <- L.parseFloat
+  value <- Lex.parseFloat
   return $ Float value loc
 
 
@@ -217,7 +217,7 @@ parseSymbolReference = do
 
   loc <- sourcePosToLoc <$> getPosition
 
-  name <- L.parseIdentifier
+  name <- Lex.parseIdentifier
   let symbol = Symbol name []
   return $ SymbolReference symbol loc
 
@@ -229,9 +229,9 @@ parseCall = do
 
   symbolPath <- parseSymbolPath
 
-  name <- L.parseIdentifier
+  name <- Lex.parseIdentifier
 
-  args <- L.parseParens $ L.parseCommaSep parseExpression
+  args <- Lex.parseParens $ Lex.parseCommaSep parseExpression
 
   let symbol = Symbol name symbolPath
   return $ Call symbol args loc
@@ -242,15 +242,15 @@ parseIf = do
 
   loc <- sourcePosToLoc <$> getPosition
 
-  L.parseReserved "if"
+  Lex.parseReserved "if"
 
   condition <- parseExpression
 
-  L.parseReserved "then"
+  Lex.parseReserved "then"
 
   ifTrue <- parseExpression
 
-  L.parseReserved "else"
+  Lex.parseReserved "else"
 
   ifFalse <- parseExpression
 
@@ -260,9 +260,9 @@ parseIf = do
 parseSymbolPath :: Parser SymbolPath
 parseSymbolPath = many $ try $ do
 
-  symbolPath <- L.parseIdentifier
+  symbolPath <- Lex.parseIdentifier
 
-  L.parseDot
+  Lex.parseDot
 
   return symbolPath
 
@@ -272,11 +272,11 @@ parseDoBlock = do
 
   loc <- sourcePosToLoc <$> getPosition
 
-  L.parseReserved "do"
+  Lex.parseReserved "do"
 
   statements <- many parseStatement
 
-  L.parseReserved "end"
+  Lex.parseReserved "end"
 
   return $ Do statements loc
 
