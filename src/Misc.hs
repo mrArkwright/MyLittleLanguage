@@ -4,8 +4,6 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Except
 
-import Data.Maybe
-
 import Text.Parsec (try, optionMaybe)
 import Text.Parsec.String (Parser)
 
@@ -23,13 +21,9 @@ lastMaybe (x : []) = Just x
 lastMaybe (_ : xs) = lastMaybe xs
 
 
-maybeError :: Maybe a -> String -> a
-maybeError value errorString = fromMaybe (error errorString) value
-
-
-maybeToExcept :: MonadError e m => Maybe a -> e -> m a
-maybeToExcept (Just x) _ = return x
-maybeToExcept Nothing err = throwError err
+maybeToError :: MonadError e m => Maybe a -> e -> m a
+maybeToError (Just x) _ = return x
+maybeToError Nothing err = throwError err
 
 
 infixl 5 -:+

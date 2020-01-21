@@ -58,7 +58,7 @@ importDefinition importPath symbolPath definition = do
   let symbol = SymbolGlobal $ GlobalSymbol name symbolPath
 
   symbolTable <- get
-  when (MM.member symbolTable importedSymbol) $ throwError ("function \"" ++ name ++ "\" redefined", Just $ Parse.definition_loc definition)
+  when (MM.member symbolTable importedSymbol) $ throwError ("(Rename) function \"" ++ name ++ "\" redefined", Just $ Parse.definition_loc definition)
 
   modify $ MM.insert importedSymbol symbol
 
@@ -129,9 +129,9 @@ renameExpression (Parse.SymbolReference symbol loc) = do
   symbolTable <- get
 
   resolvedSymbol <- case MM.lookup symbol symbolTable of
-    [] -> throwError ("symbol " ++ show symbol ++ " not found", Just loc)
+    [] -> throwError ("(Rename) symbol " ++ show symbol ++ " not found", Just loc)
     [symbol'] -> return symbol'
-    _ -> throwError ("ambigous reference to " ++ show symbol, Just loc)
+    _ -> throwError ("(Rename) ambigous reference to " ++ show symbol, Just loc)
 
   return $ SymbolReference resolvedSymbol loc
 
@@ -142,9 +142,9 @@ renameExpression (Parse.Call symbol argExprs loc) = do
   symbolTable <- get
 
   resolvedSymbol <- case MM.lookup symbol symbolTable of
-    [] -> throwError ("function " ++ show symbol ++ " not found", Just loc)
+    [] -> throwError ("(Rename) function " ++ show symbol ++ " not found", Just loc)
     [symbol'] -> return symbol'
-    _ -> throwError ("ambigous call of " ++ show symbol, Just loc)
+    _ -> throwError ("(Rename) ambigous call of " ++ show symbol, Just loc)
 
   return $ Call resolvedSymbol argExprs' loc
 

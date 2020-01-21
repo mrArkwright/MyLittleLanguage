@@ -175,9 +175,9 @@ codegenFunction symbolTable parameters expression = evalStateT' (newCodegenFunct
 
 
 basicBlockToLLVMBasicBlock :: (MonadState CodegenFunction m, MonadError Error m) => BasicBlock -> m AST.BasicBlock
-basicBlockToLLVMBasicBlock (BasicBlock name' instructions' terminator') = do
-  terminator'' <- maybeToExcept terminator' ("Block has no terminator: " ++ (show name'), Nothing)
-  return $ AST.BasicBlock (AST.Name $ B.toShort $ BC.pack name') instructions' terminator''
+basicBlockToLLVMBasicBlock (BasicBlock name instructions terminator) = do
+  terminator' <- maybeToError terminator ("(Codegen) Block has no terminator: " ++ (show name), Nothing)
+  return $ AST.BasicBlock (AST.Name $ B.toShort $ BC.pack name) instructions terminator'
 
 
 addNewBasicBlock :: (MonadState CodegenFunction m, MonadError Error m) => String -> m ()
@@ -218,9 +218,10 @@ codegenExpression (S.Int value _ _) = return $ Just $ AST.ConstantOperand $ AST.
 
 codegenExpression (S.Float value _ _) = return $ Just $ AST.ConstantOperand $ AST.C.Float (AST.Double value)
 
-codegenExpression (S.SymbolReference (S.SymbolLocal symbol) _ _) = do
+codegenExpression (S.SymbolReference (S.SymbolLocal symbol) _ loc) = do
   reference <- getLocalReference $ S.localSymbol_name symbol
-  return $ Just $ maybeError reference ("no such symbol: " ++ S.localSymbol_name symbol)
+  reference' <- maybeToError reference ("(Codegen) reference to unkown symbol: " ++ S.localSymbol_name symbol, Just loc)
+  return $ Just reference'
 
 codegenExpression (S.SymbolReference (S.SymbolGlobal symbol) _ loc) = do
   throwError ("(Codegen) codegen not implemented for global symbols (symbol: " ++ show symbol ++ ")", Just loc)
