@@ -103,12 +103,16 @@ codegenGlobalDefinition (GlobalDefinitionFunction definition) = do
 addGlobalFunction :: (MonadState Codegen m, MonadError Error m) => GlobalSymbol -> [Parameter] -> Type -> [LLVM.BasicBlock] -> m ()
 addGlobalFunction symbol parameters resultType basicBlocks = do
 
-  let parameters' = map (\parameter -> LLVM.Parameter (typeToType $ parameter_type parameter) (LLVM.Name $ B.toShort $ BC.pack $ parameter_name parameter) []) parameters
+  parameters' <- forM parameters $ \parameter -> do
+    parameterType <- typeToLlvmType $ parameter_type parameter
+    return $ LLVM.Parameter parameterType (LLVM.Name $ B.toShort $ BC.pack $ parameter_name parameter) []
+
+  resultType' <- typeToLlvmType resultType
 
   let llvmDefinition = LLVM.GlobalDefinition $ LLVM.functionDefaults {
     LLVM.name        = LLVM.Name (B.toShort $ BC.pack $ show symbol),
     LLVM.parameters  = (parameters', False),
-    LLVM.returnType  = typeToType resultType,
+    LLVM.returnType  = resultType',
     LLVM.basicBlocks = basicBlocks
   }
 
@@ -272,11 +276,14 @@ codegenExpression (Call symbol argExprs _ loc) = do
         Just (TypeFunction parameterTypes' resultType') -> return (parameterTypes', resultType')
         _ -> throwError ("(Codegen) Call to unknown symbol: " ++ show symbol, Just loc)
 
-      let functionType = LLVM.ptr $ LLVM.FunctionType (typeToType resultType) (map typeToType parameterTypes) False
+      parameterTypes' <- mapM typeToLlvmType parameterTypes
+      resultType' <- typeToLlvmType resultType
+
+      let functionType = LLVM.ptr $ LLVM.FunctionType resultType' parameterTypes' False
       let (SymbolGlobal symbol') = symbol
       let function = LLVM.ConstantOperand $ LLVM.Constant.GlobalReference functionType (LLVM.Name $ B.toShort $ BC.pack $ show symbol')
 
-      call (resultType /= TypeUnit) (typeToType resultType) function args
+      call (resultType /= TypeUnit) resultType' function args
 
 codegenExpression (If condition ifTrue ifFalse ifType loc) = do
 
@@ -300,7 +307,8 @@ codegenExpression (If condition ifTrue ifFalse ifType loc) = do
   case (trueResult, falseResult) of
 
     (Just trueResult', Just falseResult') -> do
-      ret <- phi (typeToType ifType) [(trueResult', thenLabel), (falseResult', elseLabel)]
+      ifType' <- typeToLlvmType ifType
+      ret <- phi ifType' [(trueResult', thenLabel), (falseResult', elseLabel)]
       return $ Just ret
 
     (Nothing, Nothing) -> return Nothing
@@ -442,9 +450,10 @@ addParameter parameter = do
 
 
 addLocalReference :: (MonadState CodegenFunction m, MonadError Error m) => (Name, Type) -> m LLVM.Operand
-addLocalReference (name, argType) = do
+addLocalReference (name, argumentType) = do
 
-  let newSymbol = LLVM.LocalReference (typeToType argType) (LLVM.Name $ B.toShort $ BC.pack name)
+  argumentType' <- typeToLlvmType argumentType
+  let newSymbol = LLVM.LocalReference argumentType' (LLVM.Name $ B.toShort $ BC.pack name)
 
   modify $ \s -> s { codegenFunction_symbols = M.insert name newSymbol (codegenFunction_symbols s) }
 
@@ -457,12 +466,15 @@ getLocalReference name = do
   return $ M.lookup name symbols'
 
 
-typeToType :: Type -> LLVM.Type
-typeToType TypeUnit = LLVM.VoidType
-typeToType TypeFloat = double
-typeToType TypeInt = integer
-typeToType (TypeFunction parameterTypes resultType) = LLVM.ptr $ LLVM.FunctionType (typeToType resultType) (map typeToType parameterTypes) False
-typeToType t = error $ "type not implemented: " ++ show t
+typeToLlvmType :: MonadError Error m => Type -> m LLVM.Type
+typeToLlvmType TypeUnit = return LLVM.VoidType
+typeToLlvmType TypeFloat = return double
+typeToLlvmType TypeInt = return integer
+typeToLlvmType (TypeFunction parameterTypes resultType) = do
+  parameterTypes' <- mapM typeToLlvmType parameterTypes
+  resultType' <- typeToLlvmType resultType
+  return $ LLVM.ptr $ LLVM.FunctionType resultType' parameterTypes' False
+typeToLlvmType type_ = throwError ("(Codegen) type not implemented: " ++ show type_, Nothing)
 
 
 integer :: LLVM.Type
