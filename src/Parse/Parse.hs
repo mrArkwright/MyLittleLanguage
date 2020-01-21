@@ -74,6 +74,7 @@ parseType :: Parser Type
 parseType = parseUnitType
   <|> parseIntType
   <|> parseFloatType
+  <|> parseFunctionType
 
 
 parseUnitType :: Parser Type
@@ -92,6 +93,14 @@ parseFloatType :: Parser Type
 parseFloatType = do
   L.parseReserved "Float"
   return TypeFloat
+
+
+parseFunctionType :: Parser Type
+parseFunctionType = do
+  parameterTypes <- L.parseParens $ L.parseCommaSep parseType
+  L.parseReserved "->"
+  returnType <- parseType
+  return $ TypeFunction parameterTypes returnType
 
 
 
