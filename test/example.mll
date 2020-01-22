@@ -12,6 +12,7 @@ let main(): Unit = do
   example6()
   example7()
   example8()
+  example9()
 
   Out.printDashs()
 
@@ -64,6 +65,12 @@ let example8(): Unit = do
   let minusFive(i: Int): Int = i - 5
   let result: Int = Ops.chain(plusThree, minusFive, 10)
   Out.printIntLine(result)
+end
+
+let example9(): Unit = do
+  let minusFive(f: Float): Float = f -. 5.0
+  let result: Float = minusFive(10.0)
+  Out.printFloatLine(result)
 end
 
 let plusThree(i: Int): Int = i + 3

@@ -1,5 +1,6 @@
 module Rename.Rename (rename) where
 
+import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Except
 
@@ -84,7 +85,8 @@ renameGlobalDefinition symbolPath (Parse.Definition name Nothing returnType expr
 
   let symbol = GlobalSymbol name symbolPath
 
-  expression' <- renameExpression expression
+  let symbolPath' = symbolPath -:+ name
+  expression' <- runReaderT' symbolPath' $ renameExpression expression
 
   addToDefinitions $ GlobalDefinitionValue $ GlobalValueDefinition symbol returnType expression' loc
 
@@ -98,7 +100,8 @@ renameGlobalDefinition symbolPath (Parse.Definition name (Just parameters) resul
 
   mapM_ addParameter parameters
 
-  expression' <- renameExpression expression
+  let symbolPath' = symbolPath -:+ name
+  expression' <- runReaderT' symbolPath' $ renameExpression expression
 
   modify $ \s -> s { rename_symbolTable = symbolTableBefore }
 
@@ -115,7 +118,7 @@ addParameter parameter = do
   addToSymbolTable importedSymbol symbol
 
 
-renameExpression :: (MonadState Rename m, MonadError Error m) => Parse.Expression -> m Expression
+renameExpression :: (MonadReader SymbolPath m, MonadState Rename m, MonadError Error m) => Parse.Expression -> m Expression
 renameExpression (Parse.Unit loc) = return $ Unit loc
 
 renameExpression (Parse.Int value loc) = return $ Int value loc
@@ -160,7 +163,7 @@ renameExpression (Parse.Do statements loc) = do
 
 
 
-renameStatement :: (MonadState Rename m, MonadError Error m) => Parse.Statement -> m Statement
+renameStatement :: (MonadReader SymbolPath m, MonadState Rename m, MonadError Error m) => Parse.Statement -> m Statement
 renameStatement (Parse.StatementExpression expression loc) = do
   expression' <- renameExpression expression
   return $ StatementExpression expression' loc
@@ -176,8 +179,8 @@ renameStatement (Parse.StatementDefinition (Parse.Definition name Nothing result
 
 renameStatement (Parse.StatementDefinition definition@(Parse.Definition name (Just parameters) resultType _ loc) statementLoc) = do
 
-  definitionSymbol <- renameGlobalDefinition [] definition
-  -- TODO correct path, import definition, add definition' to AST
+  symbolPath <- ask
+  definitionSymbol <- renameGlobalDefinition symbolPath definition
 
   let symbol = LocalSymbol name
   addToSymbolTable (Parse.Symbol name []) (SymbolLocal symbol)
