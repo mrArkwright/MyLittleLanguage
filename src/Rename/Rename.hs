@@ -4,26 +4,32 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Except
 
+import qualified Data.Map as M
 import qualified Data.MultiMap as MM
 
 import Misc
-import Parse.Syntax (Name, SymbolPath, Parameter(..), Type(..))
+import Parse.Syntax (SymbolPath, Parameter(..), Type(..))
 import qualified Parse.Syntax as Parse
 import Rename.Syntax
-import Builtins
+import Codegen.Builtins
+import RuntimeSystem
 
 
 
 rename :: MonadError Error m => Parse.Module -> m [GlobalDefinition]
 rename module_ = evalStateT' (Rename MM.empty []) $ do
-  mapM_ importBuiltin (builtins ++ libraryBuiltins)
+
+  mapM_ importBuiltin $ M.toList $ fmap (\(type_, _) -> type_) builtins
+  mapM_ importBuiltin $ M.toList libraryBuiltins
   importModuleVerbatim module_
+  
   renameModule module_
+  
   gets rename_definitions
 
 
-importBuiltin :: (MonadState Rename m, MonadError Error m) => (Name, Type) -> m ()
-importBuiltin (name, _) = addToSymbolTable (Parse.Symbol name []) (SymbolGlobal $ GlobalSymbol name [])
+importBuiltin :: (MonadState Rename m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
+importBuiltin (symbol @ (GlobalSymbol name symbolPath), _) = addToSymbolTable (Parse.Symbol name symbolPath) (SymbolGlobal symbol)
 
 
 importModuleVerbatim :: (MonadState Rename m, MonadError Error m) => Parse.Module -> m ()

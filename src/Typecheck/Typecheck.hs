@@ -7,11 +7,12 @@ import Control.Monad.Except
 import qualified Data.Map as M
 
 import Misc
-import Parse.Syntax (Name, Type(..), Parameter(..))
+import Parse.Syntax (Type(..), Parameter(..))
 import Rename.Syntax (Symbol(..), GlobalSymbol(..), LocalSymbol(..))
 import qualified Rename.Syntax as Rename
 import Typecheck.Syntax
-import Builtins
+import Codegen.Builtins
+import RuntimeSystem
 
 
 
@@ -21,16 +22,17 @@ type SymbolTable = M.Map Symbol Type
 typecheck :: MonadError Error m => [Rename.GlobalDefinition] -> m [GlobalDefinition]
 typecheck definitions = evalStateT' M.empty $ do
 
-  mapM_ importBuiltin $ builtins ++ libraryBuiltins
+  mapM_ importBuiltin $ M.toList $ fmap (\(type_, _) -> type_) builtins
+  mapM_ importBuiltin $ M.toList libraryBuiltins
 
   mapM_ importDefinition $ definitions
 
   mapM typecheckGlobalDefinition definitions
 
 
-importBuiltin :: (MonadState SymbolTable m, MonadError Error m) => (Name, Type) -> m ()
-importBuiltin (name, type_) = do
-  let symbol' = SymbolGlobal $ GlobalSymbol name []
+importBuiltin :: (MonadState SymbolTable m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
+importBuiltin (symbol, type_) = do
+  let symbol' = SymbolGlobal symbol
   modify $ M.insert symbol' type_
 
 
