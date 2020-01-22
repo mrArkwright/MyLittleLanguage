@@ -13,25 +13,22 @@ import Builtins
 
 
 
-type SymbolTable = MM.MultiMap Parse.Symbol Symbol
-
-
-
 rename :: MonadError Error m => Parse.Module -> m [GlobalDefinition]
-rename module_ = evalStateT' MM.empty $ do
+rename module_ = evalStateT' (Rename MM.empty []) $ do
   mapM_ importBuiltin (builtins ++ libraryBuiltins)
   importModuleVerbatim module_
   renameModule module_
+  gets rename_definitions
 
 
-importBuiltin :: (MonadState SymbolTable m, MonadError Error m) => (Name, Type) -> m ()
-importBuiltin (name, _) = modify $ MM.insert (Parse.Symbol name []) (SymbolGlobal $ GlobalSymbol name [])
+importBuiltin :: (MonadState Rename m, MonadError Error m) => (Name, Type) -> m ()
+importBuiltin (name, _) = addToSymbolTable (Parse.Symbol name []) (SymbolGlobal $ GlobalSymbol name [])
 
 
-importModuleVerbatim :: (MonadState SymbolTable m, MonadError Error m) => Parse.Module -> m ()
+importModuleVerbatim :: (MonadState Rename m, MonadError Error m) => Parse.Module -> m ()
 importModuleVerbatim = importModuleVerbatim' [] where
 
-  importModuleVerbatim' :: (MonadState SymbolTable m, MonadError Error m) => SymbolPath -> Parse.Module -> m ()
+  importModuleVerbatim' :: (MonadState Rename m, MonadError Error m) => SymbolPath -> Parse.Module -> m ()
   importModuleVerbatim' modulePath (Parse.Module moduleName submodules definitions) = do
 
     let modulePath' = modulePath -:+ moduleName
@@ -40,7 +37,7 @@ importModuleVerbatim = importModuleVerbatim' [] where
     mapM_ (importModuleVerbatim' modulePath') submodules
 
 
-importSubmodule :: (MonadState SymbolTable m, MonadError Error m) => SymbolPath -> SymbolPath -> Parse.Module -> m ()
+importSubmodule :: (MonadState Rename m, MonadError Error m) => SymbolPath -> SymbolPath -> Parse.Module -> m ()
 importSubmodule importPath modulePath (Parse.Module moduleName submodules definitions) = do
 
   let modulePath' = modulePath -:+ moduleName
@@ -50,74 +47,75 @@ importSubmodule importPath modulePath (Parse.Module moduleName submodules defini
   mapM_ (importSubmodule importPath' modulePath') submodules
 
 
-importDefinition :: (MonadState SymbolTable m, MonadError Error m) => SymbolPath -> SymbolPath -> Parse.Definition -> m ()
+importDefinition :: (MonadState Rename m, MonadError Error m) => SymbolPath -> SymbolPath -> Parse.Definition -> m ()
 importDefinition importPath symbolPath definition = do
 
   let name = Parse.definition_name definition
   let importedSymbol = Parse.Symbol name importPath
   let symbol = SymbolGlobal $ GlobalSymbol name symbolPath
 
-  symbolTable <- get
+  symbolTable <- gets rename_symbolTable
   when (MM.member symbolTable importedSymbol) $ throwError ("(Rename) function \"" ++ name ++ "\" redefined", Just $ Parse.definition_loc definition)
 
-  modify $ MM.insert importedSymbol symbol
+  modify $ \s -> s { rename_symbolTable = MM.insert importedSymbol symbol symbolTable }
 
 
-renameModule :: (MonadState SymbolTable m, MonadError Error m) => Parse.Module -> m [GlobalDefinition]
+renameModule :: (MonadState Rename m, MonadError Error m) => Parse.Module -> m ()
 renameModule = renameModule' [] where
 
-  renameModule' :: (MonadState SymbolTable m, MonadError Error m) => SymbolPath -> Parse.Module -> m [GlobalDefinition]
+  renameModule' :: (MonadState Rename m, MonadError Error m) => SymbolPath -> Parse.Module -> m ()
   renameModule' modulePath (Parse.Module moduleName submodules definitions) = do
 
-    symbolTableBefore <- get
+    symbolTableBefore <- gets rename_symbolTable
 
     let modulePath' = modulePath -:+ moduleName
 
     mapM_ (importDefinition [] modulePath') definitions
     mapM_ (importSubmodule [] modulePath') submodules
 
-    renamedDefinitions <- mapM (renameGlobalDefinition modulePath') definitions
-    renamedSubmodules <- mapM (renameModule' modulePath') submodules
-    let renamedSubmodulesDefinitions = concat renamedSubmodules
+    mapM_ (renameGlobalDefinition modulePath') definitions
+    mapM_ (renameModule' modulePath') submodules
 
-    put symbolTableBefore
-
-    return $ renamedDefinitions ++ renamedSubmodulesDefinitions
+    modify $ \s -> s { rename_symbolTable = symbolTableBefore }
 
 
-renameGlobalDefinition :: (MonadState SymbolTable m, MonadError Error m) => SymbolPath -> Parse.Definition -> m GlobalDefinition
+renameGlobalDefinition :: (MonadState Rename m, MonadError Error m) => SymbolPath -> Parse.Definition -> m GlobalSymbol
 renameGlobalDefinition symbolPath (Parse.Definition name Nothing returnType expression loc) = do
 
   let symbol = GlobalSymbol name symbolPath
 
   expression' <- renameExpression expression
 
-  return $ GlobalDefinitionValue $ GlobalValueDefinition symbol returnType expression' loc
+  addToDefinitions $ GlobalDefinitionValue $ GlobalValueDefinition symbol returnType expression' loc
+
+  return symbol
 
 renameGlobalDefinition symbolPath (Parse.Definition name (Just parameters) resultType expression loc) = do
 
   let symbol = GlobalSymbol name symbolPath
 
-  symbolTableBefore <- get
+  symbolTableBefore <- gets rename_symbolTable
 
   mapM_ addParameter parameters
 
   expression' <- renameExpression expression
 
-  put symbolTableBefore
+  modify $ \s -> s { rename_symbolTable = symbolTableBefore }
 
-  return $ GlobalDefinitionFunction $ FunctionDefinition symbol parameters resultType expression' loc
+  addToDefinitions $ GlobalDefinitionFunction $ FunctionDefinition symbol parameters resultType expression' loc
+
+  return symbol
 
 
-addParameter :: (MonadState SymbolTable m, MonadError Error m) => Parameter -> m ()
+addParameter :: (MonadState Rename m, MonadError Error m) => Parameter -> m ()
 addParameter parameter = do
   let name = parameter_name parameter
   let importedSymbol = Parse.Symbol name []
   let symbol = SymbolLocal $ LocalSymbol name
-  modify $ MM.insert importedSymbol symbol
+  addToSymbolTable importedSymbol symbol
 
 
-renameExpression :: (MonadState SymbolTable m, MonadError Error m) => Parse.Expression -> m Expression
+renameExpression :: (MonadState Rename m, MonadError Error m) => Parse.Expression -> m Expression
 renameExpression (Parse.Unit loc) = return $ Unit loc
 
 renameExpression (Parse.Int value loc) = return $ Int value loc
@@ -126,7 +124,7 @@ renameExpression (Parse.Float value loc) = return $ Float value loc
 
 renameExpression (Parse.SymbolReference symbol loc) = do
 
-  symbolTable <- get
+  symbolTable <- gets rename_symbolTable
 
   resolvedSymbol <- case MM.lookup symbol symbolTable of
     [] -> throwError ("(Rename) symbol " ++ show symbol ++ " not found", Just loc)
@@ -139,7 +137,7 @@ renameExpression (Parse.Call symbol argExprs loc) = do
 
   argExprs' <- mapM renameExpression argExprs
 
-  symbolTable <- get
+  symbolTable <- gets rename_symbolTable
 
   resolvedSymbol <- case MM.lookup symbol symbolTable of
     [] -> throwError ("(Rename) function " ++ show symbol ++ " not found", Just loc)
@@ -162,7 +160,7 @@ renameExpression (Parse.Do statements loc) = do
 
 
 
-renameStatement :: (MonadState SymbolTable m, MonadError Error m) => Parse.Statement -> m Statement
+renameStatement :: (MonadState Rename m, MonadError Error m) => Parse.Statement -> m Statement
 renameStatement (Parse.StatementExpression expression loc) = do
   expression' <- renameExpression expression
   return $ StatementExpression expression' loc
@@ -170,7 +168,7 @@ renameStatement (Parse.StatementExpression expression loc) = do
 renameStatement (Parse.StatementDefinition (Parse.Definition name Nothing resultType expression loc) statementLoc) = do
 
   let symbol = LocalSymbol name
-  modify $ MM.insert (Parse.Symbol name []) (SymbolLocal symbol)
+  addToSymbolTable (Parse.Symbol name []) (SymbolLocal symbol)
 
   expression' <- renameExpression expression
 
@@ -178,11 +176,40 @@ renameStatement (Parse.StatementDefinition (Parse.Definition name Nothing result
 
 renameStatement (Parse.StatementDefinition definition@(Parse.Definition name (Just parameters) resultType _ loc) statementLoc) = do
 
-  definition' <- renameGlobalDefinition [] definition
+  definitionSymbol <- renameGlobalDefinition [] definition
   -- TODO correct path, import definition, add definition' to AST
 
   let symbol = LocalSymbol name
+  addToSymbolTable (Parse.Symbol name []) (SymbolLocal symbol)
+
   let type_ = TypeFunction (map parameter_type parameters) resultType
-  let referenceExpression = SymbolReference (SymbolGlobal $ globalDefinitionSymbol definition') loc
+  let referenceExpression = SymbolReference (SymbolGlobal definitionSymbol) loc
 
   return $ StatementDefinition (LocalValueDefinition symbol type_ referenceExpression loc) statementLoc
+
+
+
+--------------------------------------------------------------------------------
+-- Primitives and Data Definitions
+--------------------------------------------------------------------------------
+
+
+addToSymbolTable :: (MonadState Rename m, MonadError Error m) => Parse.Symbol -> Symbol -> m ()
+addToSymbolTable symbol importedSymbol = do
+  symbolTable <- gets rename_symbolTable
+  modify $ \s -> s { rename_symbolTable = MM.insert symbol importedSymbol symbolTable }
+
+
+addToDefinitions :: (MonadState Rename m, MonadError Error m) => GlobalDefinition -> m ()
+addToDefinitions definition = do
+  definitions <- gets rename_definitions
+  modify $ \s -> s { rename_definitions = definitions -:+ definition }
+
+
+data Rename = Rename {
+  rename_symbolTable :: SymbolTable,
+  rename_definitions :: [GlobalDefinition]
+}
+
+
+type SymbolTable = MM.MultiMap Parse.Symbol Symbol

@@ -24,7 +24,11 @@ instance Show LocalSymbol where
 
 
 data Symbol = SymbolGlobal GlobalSymbol | SymbolLocal LocalSymbol
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Show Symbol where
+  show (SymbolGlobal symbol) = show symbol
+  show (SymbolLocal symbol) = show symbol
 
 
 data LocalValueDefinition = LocalValueDefinition {

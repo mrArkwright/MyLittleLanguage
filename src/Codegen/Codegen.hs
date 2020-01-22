@@ -1,6 +1,5 @@
 module Codegen.Codegen (initModule, codegen) where
 
-
 import Control.Monad.State
 import Control.Monad.Except
 
@@ -31,7 +30,7 @@ import Typecheck.Syntax
 -- Modules
 --------------------------------------------------------------------------------
 
-type SymbolTable = M.Map Symbol Type
+type SymbolTable = M.Map Symbol (Type, LLVM.Operand)
 
 data Codegen = Codegen {
   codegen_module :: LLVM.Module,
@@ -46,10 +45,16 @@ initModule name fileName = LLVM.defaultModule {
   }
 
 
+addToSymbolTable :: (MonadState Codegen m, MonadError Error m) => Symbol -> Type -> LLVM.Operand -> m ()
+addToSymbolTable symbol type_ operand = do
+  symbolTable <- gets codegen_symbolTable
+  modify $ \s -> s { codegen_symbolTable = M.insert symbol (type_, operand) symbolTable }
+
+
 codegen :: MonadError Error m => LLVM.Module -> [GlobalDefinition] -> m LLVM.Module
 codegen astModule definitions = evalStateT' (Codegen astModule M.empty) $ do
 
-  mapM_ importBuiltin $ builtins ++ libraryBuiltins
+  mapM_ importBuiltin libraryBuiltins
   mapM_ importDefinition definitions
 
   mapM_ codegenLibraryBuiltin libraryBuiltins
@@ -60,17 +65,17 @@ codegen astModule definitions = evalStateT' (Codegen astModule M.empty) $ do
 
 importBuiltin :: (MonadState Codegen m, MonadError Error m) => (Name, Type) -> m ()
 importBuiltin (name, type_) = do
-  symbolTable <- gets codegen_symbolTable
   let symbol = SymbolGlobal $ GlobalSymbol name []
-  modify $ \s -> s { codegen_symbolTable = M.insert symbol type_ symbolTable }
+  operand <- constantOperand symbol type_
+  addToSymbolTable symbol type_ operand
 
 
 importDefinition :: (MonadState Codegen m, MonadError Error m) => GlobalDefinition -> m ()
 importDefinition definition = do
-  symbolTable <- gets codegen_symbolTable
   let symbol = SymbolGlobal $ globalDefinitionSymbol definition
   let type_ = globalDefinitionType definition
-  modify $ \s -> s { codegen_symbolTable = M.insert symbol type_ symbolTable }
+  operand <- constantOperand symbol type_
+  addToSymbolTable symbol type_ operand
 
 
 codegenLibraryBuiltin :: (MonadState Codegen m, MonadError Error m) => (Name, Type) -> m ()
@@ -131,7 +136,6 @@ data CodegenFunction = CodegenFunction {
     codegenFunction_symbolTable           :: SymbolTable,
     codegenFunction_currentBasicBlock     :: BasicBlock,
     codegenFunction_basicBlocks           :: [BasicBlock],
-    codegenFunction_symbols               :: M.Map String LLVM.Operand,
     codegenFunction_namedInstructionCount :: Word,
     codegenFunction_labels                :: M.Map String Int
   } deriving Show
@@ -142,7 +146,6 @@ newCodegenFunction symbolTable = CodegenFunction {
     codegenFunction_symbolTable           = symbolTable,
     codegenFunction_currentBasicBlock     = newBasicBlock "entry",
     codegenFunction_basicBlocks           = [],
-    codegenFunction_symbols               = M.empty,
     codegenFunction_namedInstructionCount = 0,
     codegenFunction_labels                = M.empty
   }
@@ -222,13 +225,10 @@ codegenExpression (Int value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.
 
 codegenExpression (Float value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.Constant.Float (LLVM.Double value)
 
-codegenExpression (SymbolReference (SymbolLocal symbol) _ loc) = do
-  reference <- getLocalReference $ localSymbol_name symbol
-  reference' <- maybeToError reference ("(Codegen) reference to unkown symbol: " ++ localSymbol_name symbol, Just loc)
-  return $ Just reference'
-
-codegenExpression (SymbolReference (SymbolGlobal symbol) _ loc) = do
-  throwError ("(Codegen) codegen not implemented for global symbols (symbol: " ++ show symbol ++ ")", Just loc)
+codegenExpression (SymbolReference symbol _ loc) = do
+  resolvedSymbol <- resolveSymbol symbol
+  (_, operand) <- maybeToError resolvedSymbol ("(Codegen) reference to unkown symbol: " ++ show symbol, Just loc)
+  return $ Just operand
 
 codegenExpression (Call symbol argExprs _ loc) = do
 
@@ -272,16 +272,12 @@ codegenExpression (Call symbol argExprs _ loc) = do
 
       symbolTable <- gets codegenFunction_symbolTable
 
-      (parameterTypes, resultType) <- case M.lookup symbol symbolTable of
-        Just (TypeFunction parameterTypes' resultType') -> return (parameterTypes', resultType')
+      (resultType, function) <- case M.lookup symbol symbolTable of
+        Just (TypeFunction _ resultType', operand') -> return (resultType', operand')
+        Just _ -> throwError ("(Codegen) Call to non-function symbol: " ++ show symbol, Just loc)
         _ -> throwError ("(Codegen) Call to unknown symbol: " ++ show symbol, Just loc)
 
-      parameterTypes' <- mapM typeToLlvmType parameterTypes
       resultType' <- typeToLlvmType resultType
-
-      let functionType = LLVM.ptr $ LLVM.FunctionType resultType' parameterTypes' False
-      let (SymbolGlobal symbol') = symbol
-      let function = LLVM.ConstantOperand $ LLVM.Constant.GlobalReference functionType (LLVM.Name $ B.toShort $ BC.pack $ show symbol')
 
       call (resultType /= TypeUnit) resultType' function args
 
@@ -328,9 +324,9 @@ codegenStatement (StatementDefinition definition _ _) = do
 
   result <- fromJust <$> codegenExpression (localValueDefinition_expression definition)
 
-  let symbol = localValueDefinition_symbol definition
-  let name = localSymbol_name symbol
-  modify $ \s -> s { codegenFunction_symbols = M.insert name result (codegenFunction_symbols s) }
+  let symbol = SymbolLocal $ localValueDefinition_symbol definition
+  let type_ = localValueDefinition_type definition
+  addToLocalSymbolTable symbol type_ result
 
   return Nothing
 
@@ -441,29 +437,36 @@ addTerminator trm = do
   modify $ \s -> s { codegenFunction_currentBasicBlock = currentBasicBlock'' }
 
 
-addParameter :: (MonadState CodegenFunction m, MonadError Error m) => Parameter -> m LLVM.Operand
+addParameter :: (MonadState CodegenFunction m, MonadError Error m) => Parameter -> m ()
 addParameter parameter = do
-  let symbol = SymbolLocal $ LocalSymbol (parameter_name parameter)
-  modify $ \s -> s { codegenFunction_symbolTable = M.insert symbol (parameter_type parameter) (codegenFunction_symbolTable s) }
-  addLocalReference (parameter_name parameter, parameter_type parameter)
+
+  let name = parameter_name parameter
+  let symbol = SymbolLocal $ LocalSymbol name
+  let type_ = parameter_type parameter
+
+  type_' <- typeToLlvmType type_
+
+  let operand = LLVM.LocalReference type_' (LLVM.Name $ B.toShort $ BC.pack name)
+
+  addToLocalSymbolTable symbol type_ operand
 
 
-
-addLocalReference :: (MonadState CodegenFunction m, MonadError Error m) => (Name, Type) -> m LLVM.Operand
-addLocalReference (name, argumentType) = do
-
-  argumentType' <- typeToLlvmType argumentType
-  let newSymbol = LLVM.LocalReference argumentType' (LLVM.Name $ B.toShort $ BC.pack name)
-
-  modify $ \s -> s { codegenFunction_symbols = M.insert name newSymbol (codegenFunction_symbols s) }
-
-  return newSymbol
+addToLocalSymbolTable :: (MonadState CodegenFunction m, MonadError Error m) => Symbol -> Type -> LLVM.Operand -> m ()
+addToLocalSymbolTable symbol type_ operand = do
+  symbolTable <- gets codegenFunction_symbolTable
+  modify $ \s -> s { codegenFunction_symbolTable = M.insert symbol (type_, operand) symbolTable }
 
 
-getLocalReference :: (MonadState CodegenFunction m, MonadError Error m) => String -> m (Maybe LLVM.Operand)
-getLocalReference name = do
-  symbols' <- gets codegenFunction_symbols
-  return $ M.lookup name symbols'
+resolveSymbol :: (MonadState CodegenFunction m, MonadError Error m) => Symbol -> m (Maybe (Type, LLVM.Operand))
+resolveSymbol name = do
+  symbolTable <- gets codegenFunction_symbolTable
+  return $ M.lookup name symbolTable
+
+
+constantOperand :: MonadError Error m => Symbol -> Type -> m LLVM.Operand
+constantOperand symbol type_ = do
+  type_' <- typeToLlvmType type_
+  return $ LLVM.ConstantOperand $ LLVM.Constant.GlobalReference type_' (LLVM.Name $ B.toShort $ BC.pack $ show symbol)
 
 
 typeToLlvmType :: MonadError Error m => Type -> m LLVM.Type
