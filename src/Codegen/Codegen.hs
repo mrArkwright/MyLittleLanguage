@@ -1,4 +1,4 @@
-module Codegen.Codegen (initModule, codegen) where
+module Codegen.Codegen (newModule, codegen) where
 
 import Control.Monad.State
 import Control.Monad.Except
@@ -24,8 +24,8 @@ import Codegen.CodegenFunction
 -- Modules
 --------------------------------------------------------------------------------
 
-initModule :: String -> String -> LLVM.Module
-initModule name fileName = LLVM.defaultModule {
+newModule :: String -> String -> LLVM.Module
+newModule name fileName = LLVM.defaultModule {
     LLVM.moduleName = B.toShort $ BC.pack name,
     LLVM.moduleSourceFileName = B.toShort $ BC.pack fileName
   }

@@ -48,11 +48,11 @@ repl options = do
   liftIO $ putStrLn "---- MyLittleLanguage REPL ----"
 
   let moduleName = "<stdin>"
-  let freshModule = initModule moduleName moduleName
+  let module_ = newModule moduleName moduleName
 
-  liftIO $ runInputT defaultSettings $ loop freshModule where
+  liftIO $ runInputT defaultSettings $ loop module_ where
 
-    loop astModule = do
+    loop module_' = do
 
       input <- getInputLine "➜ "
 
@@ -64,16 +64,16 @@ repl options = do
 
         Just input' -> do
 
-          let moduleName = BC.unpack $ B.fromShort $ AST.moduleName astModule
-          newModule <- runExceptT $ process options moduleName astModule input'
+          let moduleName = BC.unpack $ B.fromShort $ AST.moduleName module_'
+          module_'' <- runExceptT $ process options moduleName module_' input'
 
-          case newModule of
+          case module_'' of
 
             Left err -> do
               liftIO $ print err
-              loop astModule
+              loop module_'
 
-            Right newModule' -> loop newModule'
+            Right module_''' -> loop module_'''
 
 
 
@@ -87,19 +87,19 @@ processFile options fileName = do
   source <- liftIO $ readFile fileName
 
   let moduleName = init $ dropWhileEnd (/= '.') $ fileName
-  let freshModule = initModule moduleName fileName
+  let module_ = newModule moduleName fileName
 
-  newModule <- runExceptT $ process options fileName freshModule source
+  module_' <- runExceptT $ process options fileName module_ source
 
-  case newModule of
+  case module_' of
 
     Left (err, loc) -> do
       let locString = fromMaybe "" $ fmap locDescription loc
       liftIO $ putStrLn $ "[" ++ color Red "error" ++ "] " ++ locString ++ err
       return False
 
-    Right newModule' -> do
-      compile newModule'
+    Right module_'' -> do
+      compile module_''
       return True
 
 
