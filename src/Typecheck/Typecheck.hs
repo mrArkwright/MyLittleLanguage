@@ -7,8 +7,6 @@ import Control.Monad.Except
 import qualified Data.Map as M
 
 import Misc
-import Parse.Syntax (Type(..), Parameter(..))
-import Rename.Syntax (Symbol(..), GlobalSymbol(..), LocalSymbol(..))
 import qualified Rename.Syntax as Rename
 import Typecheck.Syntax
 import Codegen.Builtins

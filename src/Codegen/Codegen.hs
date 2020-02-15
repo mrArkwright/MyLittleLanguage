@@ -12,8 +12,6 @@ import qualified LLVM.AST.Global as LLVM
 
 import Misc
 import RuntimeSystem (libraryBuiltins)
-import Parse.Syntax (Type(..), Parameter(..))
-import Rename.Syntax (Symbol(..), GlobalSymbol(..))
 import Typecheck.Syntax
 import Codegen.Lib
 import Codegen.CodegenFunction

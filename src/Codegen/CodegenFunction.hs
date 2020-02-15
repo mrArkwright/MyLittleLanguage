@@ -15,8 +15,6 @@ import qualified LLVM.AST.CallingConvention as LLVM
 import LLVM.AST.Instruction ( Named( (:=) ) )
 
 import Misc
-import Parse.Syntax (Type(..), Parameter(..))
-import Rename.Syntax (Symbol(..), LocalSymbol(..))
 import Typecheck.Syntax
 import Codegen.Lib
 import Codegen.Builtins

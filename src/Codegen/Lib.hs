@@ -11,8 +11,7 @@ import qualified LLVM.AST.Constant as LLVM.Constant
 import qualified LLVM.AST.Type as LLVM
 
 import Misc
-import Parse.Syntax (Type(..))
-import Rename.Syntax (Symbol(..))
+import Typecheck.Syntax
 
 
 

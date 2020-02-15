@@ -1,4 +1,4 @@
-module Rename.Syntax where
+module Rename.Syntax (module Parse.Syntax, module Rename.Syntax) where
 
 import Data.List
 

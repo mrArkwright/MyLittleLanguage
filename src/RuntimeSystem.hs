@@ -2,8 +2,7 @@ module RuntimeSystem where
 
 import qualified Data.Map as M
 
-import Parse.Syntax (Type(..))
-import Rename.Syntax
+import Typecheck.Syntax
 
 
 

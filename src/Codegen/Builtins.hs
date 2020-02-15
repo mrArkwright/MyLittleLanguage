@@ -6,8 +6,7 @@ import qualified LLVM.AST as LLVM
 import qualified LLVM.AST.FloatingPointPredicate as LLVM.FloatingPointPredicate
 import qualified LLVM.AST.IntegerPredicate as LLVM.IntegerPredicate
 
-import Parse.Syntax (Type(..))
-import Rename.Syntax (GlobalSymbol(..))
+import Typecheck.Syntax
 
 
 
