@@ -1,4 +1,5 @@
 module Parse.Lex (
+    parsePointer,
     parseInteger,
     parseFloat,
     parseParens,
@@ -12,10 +13,23 @@ module Parse.Lex (
   ) where
 
 import Text.Parsec.String (Parser)
+import Text.Parsec.Char
+import Text.Parsec.Prim
 import Text.Parsec.Language (emptyDef)
 
 import qualified Text.Parsec.Token as Tok
 
+
+
+parsePointer :: Parser Integer
+parsePointer = (Tok.lexeme lexer) parsePointer' <?> "pointer"
+
+
+parsePointer' :: Parser Integer
+parsePointer' = do
+  _ <- char 'p'
+  _ <- char '0'
+  Tok.hexadecimal lexer
 
 
 parseInteger :: Parser Integer

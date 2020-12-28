@@ -20,17 +20,40 @@ main = hspec $ beforeAll (setCurrentDirectory "test") $ do
 
   describe "Top" $ do
 
-    specify "process example.mll" $ do
+    specify "compile and run example.mll" $ do
+      
       let name = "example"
+      
       let files = fmap ("build/" ++) [name ++ ".ll", name ++ ".s", name ++ ".o", "builtins.o", name]
       mapM_ removeFileIfExists files
+      
       let options = Top.defaultOptions { _debug = True }
+      
       success <- processFile options (name ++ ".mll")
+      
       shouldBe success True
+      
       (exitCode, stdOutput, _) <- readProcessWithExitCode ("./build/" ++ name) [] ""
       putStr stdOutput
       when (stdOutput == "" || last stdOutput /= '\n') $ putStr "%\n"
+      
       shouldBe exitCode ExitSuccess
+
+    specify "compile LPC810_blinky.mll" $ do
+      
+      let name = "LPC810_blinky"
+      
+      let files = fmap ("build/" ++) [name ++ ".ll", name ++ ".s", name ++ ".o"]
+      mapM_ removeFileIfExists files
+      
+      let options = Top.defaultOptions {
+          _debug = True,
+          _target = EmbeddedTarget "thumbv6m-none--eabi" "cortex-m0"
+        }
+        
+      success <- processFile options (name ++ ".mll")
+      
+      shouldBe success True
 
 removeFileIfExists :: FilePath -> IO ()
 removeFileIfExists fileName = removeFile fileName `catch` handleExists

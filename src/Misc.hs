@@ -9,6 +9,10 @@ import Text.Parsec.String (Parser)
 
 
 
+data Target
+  = NativeTarget
+  | EmbeddedTarget String String
+
 data Loc = FileLineLocation String Int
   deriving (Eq, Ord, Show)
 

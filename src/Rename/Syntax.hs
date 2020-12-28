@@ -76,6 +76,7 @@ data Statement
 
 data Expression
   = Unit Loc
+  | Pointer Integer Loc
   | Int Integer Loc
   | Float Double Loc
   | SymbolReference Symbol Loc

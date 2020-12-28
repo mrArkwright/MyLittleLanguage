@@ -126,6 +126,8 @@ addParameter parameter = do
 renameExpression :: (MonadReader SymbolPath m, MonadState Rename m, MonadError Error m) => Parse.Expression -> m Expression
 renameExpression (Parse.Unit loc) = return $ Unit loc
 
+renameExpression (Parse.Pointer value loc) = return $ Pointer value loc
+
 renameExpression (Parse.Int value loc) = return $ Int value loc
 
 renameExpression (Parse.Float value loc) = return $ Float value loc

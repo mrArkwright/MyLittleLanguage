@@ -27,7 +27,7 @@ main = do
   (options, fileNames) <- case getOpt Permute optionDescriptions args of
     (o, n, [])   -> return (foldl (flip id) defaultOptions o, n)
     (_, _, errs) -> ioError (userError (concat errs ++ usageInfo "Usage: ..." optionDescriptions))
-  let processOptions = Top.Options {
+  let processOptions = Top.defaultOptions {
       Top._debug = _debug options
     }
   case fileNames of

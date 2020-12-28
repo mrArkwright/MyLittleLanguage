@@ -92,6 +92,8 @@ typecheckLocalValueDefinition (Rename.LocalValueDefinition symbol type_ expressi
 typecheckExpression :: (MonadState SymbolTable m, MonadError Error m) => Rename.Expression -> m (Expression, Type)
 typecheckExpression (Rename.Unit loc) = return (Unit TypeUnit loc, TypeUnit)
 
+typecheckExpression (Rename.Pointer value loc) = return (Pointer value TypePointer loc, TypePointer)
+
 typecheckExpression (Rename.Int value loc) = return (Int value TypeInt loc, TypeInt)
 
 typecheckExpression (Rename.Float value loc) = return (Float value TypeFloat loc, TypeFloat)

@@ -1,4 +1,4 @@
-module Top (repl, processFile, Options (..), defaultOptions) where
+module Top (repl, processFile, Options (..), defaultOptions, Target (..)) where
 
 import Data.Maybe
 import Data.List
@@ -28,12 +28,14 @@ import Compile
 
 
 data Options = Options {
-    _debug :: Bool
+    _debug :: Bool,
+    _target :: Target
   }
 
 defaultOptions :: Options
 defaultOptions = Options {
-    _debug = False
+    _debug = False,
+    _target = NativeTarget
   }
 
 
@@ -48,7 +50,7 @@ repl options = do
   liftIO $ putStrLn "---- MyLittleLanguage REPL ----"
 
   let moduleName = "<stdin>"
-  let module_ = newModule moduleName moduleName
+  let module_ = newModule moduleName moduleName Nothing
 
   liftIO $ runInputT defaultSettings $ loop module_ where
 
@@ -87,7 +89,12 @@ processFile options fileName = do
   source <- liftIO $ readFile fileName
 
   let moduleName = init $ dropWhileEnd (/= '.') $ fileName
-  let module_ = newModule moduleName fileName
+
+  let triple = case _target options of
+                 NativeTarget -> Nothing
+                 EmbeddedTarget triple' _ -> Just triple'
+
+  let module_ = newModule moduleName fileName triple
 
   module_' <- runExceptT $ process options fileName module_ source
 
@@ -99,7 +106,7 @@ processFile options fileName = do
       return False
 
     Right module_'' -> do
-      compile module_''
+      compile (_target options) module_''
       return True
 
 
@@ -120,7 +127,11 @@ process options name astModule source = do
   typedDefinitions <- typecheck renamedDefinitions
   when (_debug options) $ printTypechecked typedDefinitions
 
-  codegen astModule typedDefinitions
+  let embedded = case _target options of
+                   EmbeddedTarget _ _ -> True
+                   _ -> False
+
+  codegen embedded astModule typedDefinitions
 
 
 printParsed :: MonadIO m => Parse.Module -> m ()

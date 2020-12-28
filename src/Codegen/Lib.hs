@@ -7,6 +7,7 @@ import qualified Data.ByteString.Short as B (toShort)
 import qualified Data.ByteString.Char8 as BC
 
 import qualified LLVM.AST as LLVM
+import qualified LLVM.AST.AddrSpace as LLVM
 import qualified LLVM.AST.Constant as LLVM.Constant
 import qualified LLVM.AST.Type as LLVM
 
@@ -23,6 +24,7 @@ constantOperand symbol type_ = do
 
 typeToLlvmType :: MonadError Error m => Type -> m LLVM.Type
 typeToLlvmType TypeUnit = return LLVM.VoidType
+typeToLlvmType TypePointer = return $ LLVM.PointerType (LLVM.IntegerType 32) (LLVM.AddrSpace 0)
 typeToLlvmType TypeBoolean = return $ LLVM.IntegerType 32
 typeToLlvmType TypeInt = return $ LLVM.IntegerType 32
 typeToLlvmType TypeFloat = return $ LLVM.FloatingPointType LLVM.DoubleFP

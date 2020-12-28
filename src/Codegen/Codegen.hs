@@ -9,6 +9,7 @@ import qualified Data.ByteString.Char8 as BC
 
 import qualified LLVM.AST as LLVM
 import qualified LLVM.AST.Global as LLVM
+import qualified LLVM.AST.DataLayout as LLVM
 
 import Misc
 import RuntimeSystem (libraryBuiltins)
@@ -22,20 +23,22 @@ import Codegen.CodegenFunction
 -- Modules
 --------------------------------------------------------------------------------
 
-newModule :: String -> String -> LLVM.Module
-newModule name fileName = LLVM.defaultModule {
+newModule :: String -> String -> Maybe String -> LLVM.Module
+newModule name fileName targetTriple = LLVM.defaultModule {
     LLVM.moduleName = B.toShort $ BC.pack name,
-    LLVM.moduleSourceFileName = B.toShort $ BC.pack fileName
+    LLVM.moduleSourceFileName = B.toShort $ BC.pack fileName,
+    LLVM.moduleDataLayout = Just $ LLVM.defaultDataLayout LLVM.LittleEndian,
+    LLVM.moduleTargetTriple = (B.toShort . BC.pack) <$> targetTriple
   }
 
 
-codegen :: MonadError Error m => LLVM.Module -> [GlobalDefinition] -> m LLVM.Module
-codegen astModule definitions = evalStateT' (Codegen astModule M.empty) $ do
+codegen :: MonadError Error m => Bool -> LLVM.Module -> [GlobalDefinition] -> m LLVM.Module
+codegen embedded astModule definitions = evalStateT' (Codegen astModule M.empty) $ do
 
-  mapM_ importLibraryBuiltin $ M.toList libraryBuiltins
+  when (not embedded) $ mapM_ importLibraryBuiltin $ M.toList libraryBuiltins
   mapM_ importGlobalDefinition definitions
 
-  mapM_ codegenLibraryBuiltin $ M.toList libraryBuiltins
+  when (not embedded) $ mapM_ codegenLibraryBuiltin $ M.toList libraryBuiltins
   mapM_ codegenGlobalDefinition definitions
 
   gets codegen_module

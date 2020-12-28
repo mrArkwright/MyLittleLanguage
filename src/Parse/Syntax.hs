@@ -19,7 +19,7 @@ instance Show Symbol where
 
 
 data Type
-  = TypeUnit | TypeBoolean | TypeInt | TypeFloat | TypeFunction [Type] Type
+  = TypeUnit | TypePointer | TypeBoolean | TypeInt | TypeFloat | TypeFunction [Type] Type
   deriving (Eq, Ord, Show)
 
 
@@ -53,6 +53,7 @@ data Statement
 
 data Expression
   = Unit Loc
+  | Pointer Integer Loc
   | Int Integer Loc
   | Float Double Loc
   | SymbolReference Symbol Loc

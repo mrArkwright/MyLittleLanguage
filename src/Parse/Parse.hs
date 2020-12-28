@@ -153,6 +153,7 @@ parseExpression = buildExpressionParser operatorTable parseFactor
 
 parseFactor :: Parser Expression
 parseFactor = try parseUnit
+  <|> try parsePointer
   <|> try parseFloat
   <|> try parseInteger
   <|> try parseCall
@@ -192,6 +193,15 @@ parseUnit = do
 
   Lex.parseReserved "()"
   return $ Unit loc
+
+
+parsePointer :: Parser Expression
+parsePointer = do
+
+  loc <- sourcePosToLoc <$> getPosition
+
+  value <- Lex.parsePointer
+  return $ Pointer value loc
 
 
 parseInteger :: Parser Expression

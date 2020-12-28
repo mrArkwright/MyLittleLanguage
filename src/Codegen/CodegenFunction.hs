@@ -9,6 +9,7 @@ import qualified Data.ByteString.Short as B (toShort)
 import qualified Data.ByteString.Char8 as BC
 
 import qualified LLVM.AST as LLVM
+import qualified LLVM.AST.AddrSpace as LLVM
 import qualified LLVM.AST.Constant as LLVM.Constant
 import qualified LLVM.AST.Float as LLVM
 import qualified LLVM.AST.CallingConvention as LLVM
@@ -64,6 +65,8 @@ addParameter parameter = do
 codegenExpression :: (MonadState CodegenFunction m, MonadError Error m) => Expression -> m (Maybe LLVM.Operand)
 codegenExpression (Unit _ _) = return Nothing
 
+codegenExpression (Pointer value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.Constant.IntToPtr (LLVM.Constant.Int 32 value) (LLVM.PointerType (LLVM.IntegerType 32) (LLVM.AddrSpace 0))
+
 codegenExpression (Int value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.Constant.Int 32 value
 
 codegenExpression (Float value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.Constant.Float (LLVM.Double value)
@@ -89,9 +92,12 @@ codegenExpression (Call symbol argumentExpressions _ loc) = do
         [argument1', argument2'] -> return (argument1', argument2')
         _ -> throwError ("(Codegen) Wrong number of arguments for builtin " ++ show symbol, Just loc)
 
-      resultType' <- typeToLlvmType resultType
-
-      Just <$> (addNamedInstruction resultType' $ builtin' argument1 argument2)
+      if (resultType /= TypeUnit) then do
+        resultType' <- typeToLlvmType resultType
+        Just <$> (addNamedInstruction resultType' $ builtin' argument1 argument2)
+      else do
+        addUnnamedInstruction $ builtin' argument1 argument2
+        return Nothing
 
     Just _ ->
       throwError ("(Codegen) Call to non-function builtin: " ++ show symbol, Just loc)

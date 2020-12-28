@@ -12,6 +12,7 @@ import Typecheck.Syntax
 
 builtins :: M.Map GlobalSymbol (Type, LLVM.Operand -> LLVM.Operand -> LLVM.Instruction)
 builtins = M.fromList $ map (\(name, (type_, builtin)) -> (GlobalSymbol name [], (type_, builtin))) [
+    ("store", (TypeFunction [TypePointer, TypeInt] TypeUnit, store)),
     ("+", (TypeFunction [TypeInt, TypeInt] TypeInt, add)),
     ("-", (TypeFunction [TypeInt, TypeInt] TypeInt, sub)),
     ("<", (TypeFunction [TypeInt, TypeInt] TypeBoolean, icmp LLVM.IntegerPredicate.SLT)),
@@ -21,6 +22,10 @@ builtins = M.fromList $ map (\(name, (type_, builtin)) -> (GlobalSymbol name [],
     ("/.", (TypeFunction [TypeFloat, TypeFloat] TypeFloat, fdiv)),
     ("<.", (TypeFunction [TypeFloat, TypeFloat] TypeBoolean, fcmp LLVM.FloatingPointPredicate.ULT))
   ]
+
+
+store :: LLVM.Operand -> LLVM.Operand -> LLVM.Instruction
+store address value = LLVM.Store True address value Nothing 4 []
 
 
 add :: LLVM.Operand -> LLVM.Operand -> LLVM.Instruction
