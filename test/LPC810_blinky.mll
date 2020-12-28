@@ -8,8 +8,6 @@ let main(): Unit = do
 
 end
 
-let foo(x: Int): Unit = ()
-
 let blink(x: Int): Unit = if 0 < x then do
   store(p0xA0002180, 1)
   wait(100000)
