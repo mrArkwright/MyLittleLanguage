@@ -25,8 +25,9 @@ constantOperand symbol type_ = do
 typeToLlvmType :: MonadError Error m => Type -> m LLVM.Type
 typeToLlvmType TypeUnit = return LLVM.VoidType
 typeToLlvmType TypePointer = return $ LLVM.PointerType (LLVM.IntegerType 32) (LLVM.AddrSpace 0)
-typeToLlvmType TypeBoolean = return $ LLVM.IntegerType 32
+typeToLlvmType TypeBoolean = return $ LLVM.IntegerType 8
 typeToLlvmType TypeInt = return $ LLVM.IntegerType 32
+typeToLlvmType TypeInt8 = return $ LLVM.IntegerType 8
 typeToLlvmType TypeFloat = return $ LLVM.FloatingPointType LLVM.DoubleFP
 typeToLlvmType (TypeFunction parameterTypes resultType) = do
   parameterTypes' <- mapM typeToLlvmType parameterTypes

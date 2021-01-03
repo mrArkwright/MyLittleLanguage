@@ -12,7 +12,7 @@ import qualified LLVM.AST.Global as LLVM
 import qualified LLVM.AST.DataLayout as LLVM
 
 import Misc
-import RuntimeSystem (libraryBuiltins)
+import RuntimeSystem (nativeBuiltins, arduinoBuiltins)
 import Typecheck.Syntax
 import Codegen.Lib
 import Codegen.CodegenFunction
@@ -32,13 +32,21 @@ newModule name fileName targetTriple = LLVM.defaultModule {
   }
 
 
-codegen :: MonadError Error m => Bool -> LLVM.Module -> [GlobalDefinition] -> m LLVM.Module
-codegen embedded astModule definitions = evalStateT' (Codegen astModule M.empty) $ do
+codegen :: MonadError Error m => Target -> LLVM.Module -> [GlobalDefinition] -> m LLVM.Module
+codegen target astModule definitions = evalStateT' (Codegen astModule M.empty) $ do
 
-  when (not embedded) $ mapM_ importLibraryBuiltin $ M.toList libraryBuiltins
+  case target of
+    NativeTarget -> mapM_ importLibraryBuiltin $ M.toList nativeBuiltins
+    ArduinoTarget _ _ -> mapM_ importLibraryBuiltin $ M.toList arduinoBuiltins
+    _ -> return ()
+
   mapM_ importGlobalDefinition definitions
-
-  when (not embedded) $ mapM_ codegenLibraryBuiltin $ M.toList libraryBuiltins
+  
+  case target of
+    NativeTarget -> mapM_ codegenLibraryBuiltin $ M.toList nativeBuiltins
+    ArduinoTarget _ _ -> mapM_ codegenLibraryBuiltin $ M.toList arduinoBuiltins
+    _ -> return ()
+   
   mapM_ codegenGlobalDefinition definitions
 
   gets codegen_module

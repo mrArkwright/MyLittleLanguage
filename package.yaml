@@ -6,7 +6,9 @@ copyright: 2017 Jannik Theiß
 extra-source-files:
   - README.md
 
-data-files: rts/builtins.c
+data-files:
+  - rts/builtins.c
+  - rts/runtime_arduino.ll
 
 ghc-options: -Wall
 

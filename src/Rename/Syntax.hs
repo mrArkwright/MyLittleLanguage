@@ -78,6 +78,7 @@ data Expression
   = Unit Loc
   | Pointer Integer Loc
   | Int Integer Loc
+  | Int8 Integer Loc
   | Float Double Loc
   | SymbolReference Symbol Loc
   | Call Symbol [Expression] Loc

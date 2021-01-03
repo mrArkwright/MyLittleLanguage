@@ -73,6 +73,7 @@ parseModule = do
 parseType :: Parser Type
 parseType = parseUnitType
   <|> parseIntType
+  <|> parseInt8Type
   <|> parseFloatType
   <|> parseFunctionType
 
@@ -87,6 +88,12 @@ parseIntType :: Parser Type
 parseIntType = do
   Lex.parseReserved "Int"
   return TypeInt
+
+
+parseInt8Type :: Parser Type
+parseInt8Type = do
+  Lex.parseReserved "Int8"
+  return TypeInt8
 
 
 parseFloatType :: Parser Type
@@ -155,6 +162,7 @@ parseFactor :: Parser Expression
 parseFactor = try parseUnit
   <|> try parsePointer
   <|> try parseFloat
+  <|> try parseInteger8
   <|> try parseInteger
   <|> try parseCall
   <|> parseSymbolReference
@@ -211,6 +219,15 @@ parseInteger = do
 
   value <- Lex.parseInteger
   return $ Int value loc
+
+
+parseInteger8 :: Parser Expression
+parseInteger8 = do
+
+  loc <- sourcePosToLoc <$> getPosition
+
+  value <- Lex.parseInteger8
+  return $ Int8 value loc
 
 
 parseFloat :: Parser Expression

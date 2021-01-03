@@ -69,6 +69,8 @@ codegenExpression (Pointer value _ _) = return $ Just $ LLVM.ConstantOperand $ L
 
 codegenExpression (Int value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.Constant.Int 32 value
 
+codegenExpression (Int8 value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.Constant.Int 8 value
+
 codegenExpression (Float value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.Constant.Float (LLVM.Double value)
 
 codegenExpression (SymbolReference symbol _ loc) = do

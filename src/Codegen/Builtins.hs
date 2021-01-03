@@ -25,7 +25,7 @@ builtins = M.fromList $ map (\(name, (type_, builtin)) -> (GlobalSymbol name [],
 
 
 store :: LLVM.Operand -> LLVM.Operand -> LLVM.Instruction
-store address value = LLVM.Store True address value Nothing 4 []
+store address value = LLVM.Store True address value Nothing 1 []
 
 
 add :: LLVM.Operand -> LLVM.Operand -> LLVM.Instruction

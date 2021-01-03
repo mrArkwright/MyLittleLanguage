@@ -19,7 +19,8 @@ rename :: MonadError Error m => Parse.Module -> m [GlobalDefinition]
 rename module_ = evalStateT' (Rename MM.empty []) $ do
 
   mapM_ importBuiltin $ M.toList $ fmap (\(type_, _) -> type_) builtins
-  mapM_ importBuiltin $ M.toList libraryBuiltins
+  mapM_ importBuiltin $ M.toList nativeBuiltins
+  mapM_ importBuiltin $ M.toList arduinoBuiltins
   importModuleVerbatim module_
   
   renameModule module_
@@ -129,6 +130,8 @@ renameExpression (Parse.Unit loc) = return $ Unit loc
 renameExpression (Parse.Pointer value loc) = return $ Pointer value loc
 
 renameExpression (Parse.Int value loc) = return $ Int value loc
+
+renameExpression (Parse.Int8 value loc) = return $ Int8 value loc
 
 renameExpression (Parse.Float value loc) = return $ Float value loc
 

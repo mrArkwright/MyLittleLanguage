@@ -1,6 +1,7 @@
 module Parse.Lex (
     parsePointer,
     parseInteger,
+    parseInteger8,
     parseFloat,
     parseParens,
     parseCommaSep,
@@ -34,6 +35,15 @@ parsePointer' = do
 
 parseInteger :: Parser Integer
 parseInteger = Tok.integer lexer
+
+
+parseInteger8 :: Parser Integer
+parseInteger8 = (Tok.lexeme lexer) parseInteger8' <?> "integer8"
+
+parseInteger8' :: Parser Integer
+parseInteger8' = do
+  _ <- string "08d"
+  Tok.decimal lexer
 
 
 parseFloat :: Parser Double

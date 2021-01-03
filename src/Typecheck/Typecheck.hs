@@ -21,7 +21,8 @@ typecheck :: MonadError Error m => [Rename.GlobalDefinition] -> m [GlobalDefinit
 typecheck definitions = evalStateT' M.empty $ do
 
   mapM_ importBuiltin $ M.toList $ fmap (\(type_, _) -> type_) builtins
-  mapM_ importBuiltin $ M.toList libraryBuiltins
+  mapM_ importBuiltin $ M.toList nativeBuiltins
+  mapM_ importBuiltin $ M.toList arduinoBuiltins
 
   mapM_ importDefinition $ definitions
 
@@ -95,6 +96,8 @@ typecheckExpression (Rename.Unit loc) = return (Unit TypeUnit loc, TypeUnit)
 typecheckExpression (Rename.Pointer value loc) = return (Pointer value TypePointer loc, TypePointer)
 
 typecheckExpression (Rename.Int value loc) = return (Int value TypeInt loc, TypeInt)
+
+typecheckExpression (Rename.Int8 value loc) = return (Int8 value TypeInt8 loc, TypeInt8)
 
 typecheckExpression (Rename.Float value loc) = return (Float value TypeFloat loc, TypeFloat)
 

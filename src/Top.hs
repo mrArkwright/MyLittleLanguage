@@ -93,6 +93,7 @@ processFile options fileName = do
   let triple = case _target options of
                  NativeTarget -> Nothing
                  EmbeddedTarget triple' _ -> Just triple'
+                 ArduinoTarget triple' _ -> Just triple'
 
   let module_ = newModule moduleName fileName triple
 
@@ -127,11 +128,10 @@ process options name astModule source = do
   typedDefinitions <- typecheck renamedDefinitions
   when (_debug options) $ printTypechecked typedDefinitions
 
-  let embedded = case _target options of
-                   EmbeddedTarget _ _ -> True
-                   _ -> False
+  generatedModule <- codegen (_target options) astModule typedDefinitions
+  when (_debug options) $ printCodeGenerated generatedModule
 
-  codegen embedded astModule typedDefinitions
+  return generatedModule
 
 
 printParsed :: MonadIO m => Parse.Module -> m ()
@@ -160,3 +160,10 @@ printTypechecked :: MonadIO m => [Typecheck.GlobalDefinition] -> m ()
 printTypechecked definitions = do
   liftIO $ putStrLn "---- Typecheckd ----"
   liftIO $ mapM_ (putStrLn . (++ "\n") . show) definitions
+
+printCodeGenerated :: MonadIO m => AST.Module -> m ()
+printCodeGenerated module_ = do
+  liftIO $ putStrLn "---- Module ----"
+  liftIO $ print module_
+  liftIO $ putStrLn ""
+

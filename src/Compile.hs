@@ -29,6 +29,8 @@ import Misc
 compile :: (MonadIO m) => Target -> AST.Module -> m ()
 compile NativeTarget astModule = compileNative astModule
 compile (EmbeddedTarget triple cpu) astModule = compileEmbedded triple cpu astModule
+compile (ArduinoTarget triple cpu) astModule = compileArduino triple cpu astModule
+
 
 compileNative :: (MonadIO m) => AST.Module -> m ()
 compileNative astModule = liftIO $ withContext $ \context ->
@@ -90,6 +92,41 @@ compileEmbedded triple cpu astModule = liftIO $ withContext $ \context ->
           bytes <- moduleObject targetMachine llvmModule
           let objectFileName = inBuildFolder $ moduleName ++ ".o"
           B.writeFile objectFileName bytes
+
+
+compileArduino :: (MonadIO m) => String -> String -> AST.Module -> m ()
+compileArduino triple cpu astModule = liftIO $ withContext $ \context ->
+
+  withModuleFromAST context astModule $ \llvmModule ->
+
+    withTargetOptions $ \targetOptions ->
+
+      withPassManager optimizationPasses $ \passManager -> do
+
+        _ <- runPassManager passManager llvmModule
+
+        createDirectoryIfMissing False buildFolder
+
+        initializeAllTargets
+        let triple' = B.toShort $ BC.pack triple
+        (target, _) <- lookupTarget Nothing triple'
+        let cpu' = BC.pack cpu
+        let features = M.empty
+
+        withTargetMachine target triple' cpu' features targetOptions Relocation.Default CodeModel.Default CodeGenOpt.None $ \targetMachine -> do
+
+          let moduleName = BC.unpack $ B.fromShort $ AST.moduleName astModule
+
+          writeLLVMAssemblyToFile (File $ inBuildFolder $ moduleName ++ ".ll") llvmModule
+
+          writeTargetAssemblyToFile targetMachine (File $ inBuildFolder $ moduleName ++ ".s") llvmModule
+
+          bytes <- moduleObject targetMachine llvmModule
+          let objectFileName = inBuildFolder $ moduleName ++ ".o"
+          B.writeFile objectFileName bytes
+
+          runtimePath <- getDataFileName "rts/runtime_arduino.ll"
+          callProcess "llc-9" ["-mtriple=" ++ triple, "-mcpu=" ++ cpu, "-filetype=obj", runtimePath, "-o", inBuildFolder "runtime_arduino.o"]
 
 
 optimizationPasses :: PassManager.PassSetSpec
