@@ -7,7 +7,7 @@ extra-source-files:
   - README.md
 
 data-files:
-  - runtime/runtime_native.c
+  - runtime/runtime_native.ll
   - runtime/runtime_arduino.ll
 
 ghc-options: -Wall
