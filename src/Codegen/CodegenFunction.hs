@@ -172,7 +172,7 @@ codegenStatement (StatementDefinition definition _ _) = do
 -- Instructions
 --------------------------------------------------------------------------------
 
-addCall :: (MonadState CodegenFunction m, MonadError Error m) => Bool -> LLVM.Type -> LLVM.Operand -> [LLVM.Operand] -> m (Maybe LLVM.Operand)
+addCall :: MonadState CodegenFunction m => Bool -> LLVM.Type -> LLVM.Operand -> [LLVM.Operand] -> m (Maybe LLVM.Operand)
 addCall named returnType fn args = do
 
   let callInstruction = LLVM.Call Nothing LLVM.C [] (Right fn) [(arg, []) | arg <- args] [] []
@@ -184,11 +184,11 @@ addCall named returnType fn args = do
     return Nothing
 
 
-addBr :: (MonadState CodegenFunction m, MonadError Error m) => String -> m ()
+addBr :: MonadState CodegenFunction m => String -> m ()
 addBr label = addTerminator $ LLVM.Do $ LLVM.Br (LLVM.Name $ B.toShort $ BC.pack label) []
 
 
-addCondBr :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Operand -> String -> String -> m ()
+addCondBr :: MonadState CodegenFunction m => LLVM.Operand -> String -> String -> m ()
 addCondBr condition trueLabel falseLabel =
 
   let trueLabel'  = LLVM.Name $ B.toShort $ BC.pack trueLabel in
@@ -197,13 +197,13 @@ addCondBr condition trueLabel falseLabel =
   addTerminator $ LLVM.Do $ LLVM.CondBr condition trueLabel' falseLabel' []
 
 
-addPhi :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Type -> [(LLVM.Operand, String)] -> m LLVM.Operand
+addPhi :: MonadState CodegenFunction m => LLVM.Type -> [(LLVM.Operand, String)] -> m LLVM.Operand
 addPhi resultType incoming =
   let incoming' = map (\(operand, label) -> (operand, LLVM.Name $ B.toShort $ BC.pack label)) incoming in
   addNamedInstruction resultType $ LLVM.Phi resultType incoming' []
 
 
-addNamedInstruction :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Type -> LLVM.Instruction -> m LLVM.Operand
+addNamedInstruction :: MonadState CodegenFunction m => LLVM.Type -> LLVM.Instruction -> m LLVM.Operand
 addNamedInstruction instrType instruction = do
 
   n <- nextRegisterNumber
@@ -214,11 +214,11 @@ addNamedInstruction instrType instruction = do
   return $ LLVM.LocalReference instrType ref
 
 
-addUnnamedInstruction :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Instruction -> m ()
+addUnnamedInstruction :: MonadState CodegenFunction m => LLVM.Instruction -> m ()
 addUnnamedInstruction instruction = addInstruction $ LLVM.Do instruction
 
 
-addReturnValue :: (MonadState CodegenFunction m, MonadError Error m) => Maybe LLVM.Operand -> m ()
+addReturnValue :: MonadState CodegenFunction m => Maybe LLVM.Operand -> m ()
 addReturnValue val = addTerminator $ LLVM.Do $ LLVM.Ret val []
 
 
@@ -227,46 +227,46 @@ addReturnValue val = addTerminator $ LLVM.Do $ LLVM.Ret val []
 -- CodegenFunction primitives and data definition
 --------------------------------------------------------------------------------
 
-addToLocalSymbolTable :: (MonadState CodegenFunction m, MonadError Error m) => Symbol -> Type -> LLVM.Operand -> m ()
+addToLocalSymbolTable :: MonadState CodegenFunction m => Symbol -> Type -> LLVM.Operand -> m ()
 addToLocalSymbolTable symbol type_ operand = do
   symbolTable <- gets codegenFunction_symbolTable
   modify $ \s -> s { codegenFunction_symbolTable = M.insert symbol (type_, operand) symbolTable }
 
 
-resolveSymbol :: (MonadState CodegenFunction m, MonadError Error m) => Symbol -> m (Maybe (Type, LLVM.Operand))
+resolveSymbol :: MonadState CodegenFunction m => Symbol -> m (Maybe (Type, LLVM.Operand))
 resolveSymbol name = do
   symbolTable <- gets codegenFunction_symbolTable
   return $ M.lookup name symbolTable
 
 
-addNewBasicBlock :: (MonadState CodegenFunction m, MonadError Error m) => String -> m ()
+addNewBasicBlock :: MonadState CodegenFunction m => String -> m ()
 addNewBasicBlock name = do
   currentBasicBlock <- gets codegenFunction_currentBasicBlock
   addBasicBlock currentBasicBlock
   modify $ \s -> s { codegenFunction_currentBasicBlock = newBasicBlock name }
 
 
-addBasicBlock :: (MonadState CodegenFunction m, MonadError Error m) => BasicBlock -> m ()
+addBasicBlock :: MonadState CodegenFunction m => BasicBlock -> m ()
 addBasicBlock basicBlock = do
   basicBlocks <- gets codegenFunction_basicBlocks
   modify $ \s -> s { codegenFunction_basicBlocks = basicBlocks -:+ basicBlock }
 
 
-addInstruction :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Named LLVM.Instruction -> m ()
+addInstruction :: MonadState CodegenFunction m => LLVM.Named LLVM.Instruction -> m ()
 addInstruction instruction = do
   currentBasicBlock <- gets codegenFunction_currentBasicBlock
   let currentBasicBlock' = currentBasicBlock { basicBlock_instructions = basicBlock_instructions currentBasicBlock -:+ instruction }
   modify $ \s -> s { codegenFunction_currentBasicBlock = currentBasicBlock' }
 
 
-addTerminator :: (MonadState CodegenFunction m, MonadError Error m) => LLVM.Named LLVM.Terminator -> m ()
+addTerminator :: MonadState CodegenFunction m => LLVM.Named LLVM.Terminator -> m ()
 addTerminator trm = do
   currentBasicBlock <- gets codegenFunction_currentBasicBlock
   let currentBasicBlock' = currentBasicBlock { basicBlock_terminator = Just trm }
   modify $ \s -> s { codegenFunction_currentBasicBlock = currentBasicBlock' }
 
 
-nextRegisterNumber :: (MonadState CodegenFunction m, MonadError Error m) => m Word
+nextRegisterNumber :: MonadState CodegenFunction m => m Word
 nextRegisterNumber = do
 
   n <- gets codegenFunction_namedInstructionCount
@@ -277,7 +277,7 @@ nextRegisterNumber = do
   return m
 
 
-makeUniqueLabel :: (MonadState CodegenFunction m, MonadError Error m) => String -> m String
+makeUniqueLabel :: MonadState CodegenFunction m => String -> m String
 makeUniqueLabel label = do
 
   labels' <- gets codegenFunction_labels

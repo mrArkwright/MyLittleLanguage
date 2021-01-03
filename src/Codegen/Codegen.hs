@@ -117,14 +117,14 @@ addGlobalFunction symbol parameters resultType basicBlocks = do
 -- Codegen primitives and data definition
 --------------------------------------------------------------------------------
 
-addToModuleDefinitions :: (MonadState Codegen m, MonadError Error m) => LLVM.Definition -> m ()
+addToModuleDefinitions :: MonadState Codegen m => LLVM.Definition -> m ()
 addToModuleDefinitions definition = do
   module_ <- gets codegen_module
   let moduleDefinitions = LLVM.moduleDefinitions module_
   modify $ \s -> s { codegen_module = module_ { LLVM.moduleDefinitions = moduleDefinitions -:+ definition } }
 
 
-addToSymbolTable :: (MonadState Codegen m, MonadError Error m) => Symbol -> Type -> LLVM.Operand -> m ()
+addToSymbolTable :: MonadState Codegen m => Symbol -> Type -> LLVM.Operand -> m ()
 addToSymbolTable symbol type_ operand = do
   symbolTable <- gets codegen_symbolTable
   modify $ \s -> s { codegen_symbolTable = M.insert symbol (type_, operand) symbolTable }

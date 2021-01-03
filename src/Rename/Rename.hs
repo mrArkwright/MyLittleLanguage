@@ -32,7 +32,7 @@ rename target module_ = evalStateT' (Rename MM.empty []) $ do
   gets rename_definitions
 
 
-importGlobalSymbol :: (MonadState Rename m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
+importGlobalSymbol :: MonadState Rename m => (GlobalSymbol, Type) -> m ()
 importGlobalSymbol (symbol @ (GlobalSymbol name symbolPath), _) = addToSymbolTable (Parse.Symbol name symbolPath) (SymbolGlobal symbol)
 
 
@@ -120,7 +120,7 @@ renameGlobalDefinition symbolPath (Parse.Definition name (Just parameters) resul
   return symbol
 
 
-addParameter :: (MonadState Rename m, MonadError Error m) => Parameter -> m ()
+addParameter :: MonadState Rename m => Parameter -> m ()
 addParameter parameter = do
   let name = parameter_name parameter
   let importedSymbol = Parse.Symbol name []
@@ -211,13 +211,13 @@ renameStatement (Parse.StatementDefinition definition@(Parse.Definition name (Ju
 --------------------------------------------------------------------------------
 
 
-addToSymbolTable :: (MonadState Rename m, MonadError Error m) => Parse.Symbol -> Symbol -> m ()
+addToSymbolTable :: MonadState Rename m => Parse.Symbol -> Symbol -> m ()
 addToSymbolTable symbol importedSymbol = do
   symbolTable <- gets rename_symbolTable
   modify $ \s -> s { rename_symbolTable = MM.insert symbol importedSymbol symbolTable }
 
 
-addToDefinitions :: (MonadState Rename m, MonadError Error m) => GlobalDefinition -> m ()
+addToDefinitions :: MonadState Rename m => GlobalDefinition -> m ()
 addToDefinitions definition = do
   definitions <- gets rename_definitions
   modify $ \s -> s { rename_definitions = definitions -:+ definition }

@@ -32,13 +32,13 @@ typecheck target definitions = evalStateT' M.empty $ do
   mapM typecheckGlobalDefinition definitions
 
 
-importGlobalSymbol :: (MonadState SymbolTable m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
+importGlobalSymbol :: MonadState SymbolTable m => (GlobalSymbol, Type) -> m ()
 importGlobalSymbol (symbol, type_) = do
   let symbol' = SymbolGlobal symbol
   modify $ M.insert symbol' type_
 
 
-importDefinition :: (MonadState SymbolTable m, MonadError Error m) => Rename.GlobalDefinition -> m ()
+importDefinition :: MonadState SymbolTable m => Rename.GlobalDefinition -> m ()
 importDefinition definition = modify $ M.insert (SymbolGlobal $ Rename.globalDefinitionSymbol definition) (Rename.globalDefinitionType definition)
 
 
@@ -62,7 +62,7 @@ typecheckGlobalDefinition (Rename.GlobalDefinitionFunction (Rename.FunctionDefin
   return $ GlobalDefinitionFunction $ FunctionDefinition symbol parameters resultType typedExpression loc
 
 
-addParameter :: (MonadState SymbolTable m, MonadError Error m) => Parameter -> m ()
+addParameter :: MonadState SymbolTable m => Parameter -> m ()
 addParameter parameter = do
   let symbol = LocalSymbol (parameter_name parameter)
   let type_ = parameter_type parameter
@@ -157,5 +157,5 @@ typecheckExpression (Rename.Do statements loc) = do
    Nothing -> throwError ("(Typecheck) empty do block", Just loc)
 
 
-findSymbol :: (MonadState SymbolTable m, MonadError Error m) => Symbol -> m (Maybe Type)
+findSymbol :: MonadState SymbolTable m => Symbol -> m (Maybe Type)
 findSymbol symbol = gets $ M.lookup symbol
