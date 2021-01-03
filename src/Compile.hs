@@ -15,7 +15,7 @@ import LLVM.Relocation as Relocation
 import LLVM.CodeModel as CodeModel
 import LLVM.CodeGenOpt as CodeGenOpt
 import LLVM.Context
-import LLVM.Target (withHostTargetMachine, withTargetOptions, initializeAllTargets, lookupTarget, withTargetMachine)
+import LLVM.Target (withTargetOptions, initializeAllTargets, lookupTarget, withTargetMachine, getProcessTargetTriple, getHostCPUName, getHostCPUFeatures)
 import LLVM.PassManager (withPassManager, runPassManager)
 import qualified LLVM.PassManager as PassManager
 import qualified LLVM.AST as AST
@@ -41,25 +41,34 @@ compileNative astModule = liftIO $ withContext $ \context ->
 
       _ <- runPassManager passManager llvmModule
 
-      withHostTargetMachine Relocation.Default CodeModel.Default CodeGenOpt.Default $ \targetMachine -> do
+      createDirectoryIfMissing False buildFolder
 
-        createDirectoryIfMissing False buildFolder
+      initializeAllTargets
 
-        let moduleName = BC.unpack $ B.fromShort $ AST.moduleName astModule
+      triple <- getProcessTargetTriple
+      cpu <- getHostCPUName
+      features <- getHostCPUFeatures
+      (target, _) <- lookupTarget Nothing triple
 
-        writeLLVMAssemblyToFile (File $ inBuildFolder $ moduleName ++ ".ll") llvmModule
+      withTargetOptions $ \targetOptions ->
 
-        writeTargetAssemblyToFile targetMachine (File $ inBuildFolder $ moduleName ++ ".s") llvmModule
+        withTargetMachine target triple cpu features targetOptions Relocation.Default CodeModel.Default CodeGenOpt.Default $ \targetMachine -> do
 
-        bytes <- moduleObject targetMachine llvmModule
+          let moduleName = BC.unpack $ B.fromShort $ AST.moduleName astModule
 
-        let objectFilePath = inBuildFolder $ moduleName ++ ".o"
-        B.writeFile objectFilePath bytes
+          writeLLVMAssemblyToFile (File $ inBuildFolder $ moduleName ++ ".ll") llvmModule
 
-        runtimePath <- getDataFileName "runtime/runtime_native.c"
-        callProcess "clang" [runtimePath, "-c", "-o", inBuildFolder "builtins.o"]
+          writeTargetAssemblyToFile targetMachine (File $ inBuildFolder $ moduleName ++ ".s") llvmModule
 
-        callProcess "ld" ["-e", "_Main.main", "-lSystem", objectFilePath, inBuildFolder "builtins.o", "-o", inBuildFolder moduleName]
+          bytes <- moduleObject targetMachine llvmModule
+
+          let objectFilePath = inBuildFolder $ moduleName ++ ".o"
+          B.writeFile objectFilePath bytes
+
+          runtimePath <- getDataFileName "runtime/runtime_native.c"
+          callProcess "clang" [runtimePath, "-c", "-o", inBuildFolder "builtins.o"]
+
+          callProcess "ld" ["-e", "_Main.main", "-lSystem", objectFilePath, inBuildFolder "builtins.o", "-o", inBuildFolder moduleName]
 
 
 compileEmbedded :: (MonadIO m) => String -> String -> AST.Module -> m ()
