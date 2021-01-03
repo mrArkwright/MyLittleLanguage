@@ -7,3 +7,4 @@ build/
 /MyLittleLanguage.iml
 /stack.yaml.lock
 /target
+/examples/arduino_blinky/arduino_device
