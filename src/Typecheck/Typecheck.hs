@@ -21,8 +21,8 @@ typecheck :: MonadError Error m => [Rename.GlobalDefinition] -> m [GlobalDefinit
 typecheck definitions = evalStateT' M.empty $ do
 
   mapM_ importBuiltin $ M.toList $ fmap (\(type_, _) -> type_) builtins
-  mapM_ importBuiltin $ M.toList nativeBuiltins
-  mapM_ importBuiltin $ M.toList arduinoBuiltins
+  mapM_ importBuiltin $ M.toList nativeRuntimeSymbols
+  mapM_ importBuiltin $ M.toList arduinoRuntimeSymbols
 
   mapM_ importDefinition $ definitions
 

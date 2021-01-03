@@ -19,8 +19,8 @@ rename :: MonadError Error m => Parse.Module -> m [GlobalDefinition]
 rename module_ = evalStateT' (Rename MM.empty []) $ do
 
   mapM_ importBuiltin $ M.toList $ fmap (\(type_, _) -> type_) builtins
-  mapM_ importBuiltin $ M.toList nativeBuiltins
-  mapM_ importBuiltin $ M.toList arduinoBuiltins
+  mapM_ importBuiltin $ M.toList nativeRuntimeSymbols
+  mapM_ importBuiltin $ M.toList arduinoRuntimeSymbols
   importModuleVerbatim module_
   
   renameModule module_

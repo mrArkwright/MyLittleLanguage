@@ -12,7 +12,7 @@ import qualified LLVM.AST.Global as LLVM
 import qualified LLVM.AST.DataLayout as LLVM
 
 import Misc
-import RuntimeSystem (nativeBuiltins, arduinoBuiltins)
+import RuntimeSystem (nativeRuntimeSymbols, arduinoRuntimeSymbols)
 import Typecheck.Syntax
 import Codegen.Lib
 import Codegen.CodegenFunction
@@ -36,15 +36,15 @@ codegen :: MonadError Error m => Target -> LLVM.Module -> [GlobalDefinition] -> 
 codegen target astModule definitions = evalStateT' (Codegen astModule M.empty) $ do
 
   case target of
-    NativeTarget -> mapM_ importLibraryBuiltin $ M.toList nativeBuiltins
-    ArduinoTarget _ _ -> mapM_ importLibraryBuiltin $ M.toList arduinoBuiltins
+    NativeTarget -> mapM_ importLibraryBuiltin $ M.toList nativeRuntimeSymbols
+    ArduinoTarget _ _ -> mapM_ importLibraryBuiltin $ M.toList arduinoRuntimeSymbols
     _ -> return ()
 
   mapM_ importGlobalDefinition definitions
   
   case target of
-    NativeTarget -> mapM_ codegenLibraryBuiltin $ M.toList nativeBuiltins
-    ArduinoTarget _ _ -> mapM_ codegenLibraryBuiltin $ M.toList arduinoBuiltins
+    NativeTarget -> mapM_ codegenLibraryBuiltin $ M.toList nativeRuntimeSymbols
+    ArduinoTarget _ _ -> mapM_ codegenLibraryBuiltin $ M.toList arduinoRuntimeSymbols
     _ -> return ()
    
   mapM_ codegenGlobalDefinition definitions

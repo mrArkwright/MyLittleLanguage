@@ -56,8 +56,8 @@ compileNative astModule = liftIO $ withContext $ \context ->
         let objectFilePath = inBuildFolder $ moduleName ++ ".o"
         B.writeFile objectFilePath bytes
 
-        builtinsPath <- getDataFileName "rts/builtins.c"
-        callProcess "clang" [builtinsPath, "-c", "-o", inBuildFolder "builtins.o"]
+        runtimePath <- getDataFileName "runtime/runtime_native.c"
+        callProcess "clang" [runtimePath, "-c", "-o", inBuildFolder "builtins.o"]
 
         callProcess "ld" ["-e", "_Main.main", "-lSystem", objectFilePath, inBuildFolder "builtins.o", "-o", inBuildFolder moduleName]
 
@@ -125,7 +125,7 @@ compileArduino triple cpu astModule = liftIO $ withContext $ \context ->
           let objectFileName = inBuildFolder $ moduleName ++ ".o"
           B.writeFile objectFileName bytes
 
-          runtimePath <- getDataFileName "rts/runtime_arduino.ll"
+          runtimePath <- getDataFileName "runtime/runtime_arduino.ll"
           callProcess "llc-9" ["-mtriple=" ++ triple, "-mcpu=" ++ cpu, "-filetype=obj", runtimePath, "-o", inBuildFolder "runtime_arduino.o"]
 
 
