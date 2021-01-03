@@ -68,7 +68,7 @@ compileNative astModule = liftIO $ withContext $ \context ->
           runtimePath <- getDataFileName "runtime/runtime_native.ll"
           callProcess "llc-9" ["-mtriple=" ++ (BC.unpack $ B.fromShort triple), "-mcpu=" ++ (BC.unpack cpu), "-filetype=obj", runtimePath, "-o", inBuildFolder "runtime_native.o"]
 
-          callProcess "ld" ["-e", "_Main.main", "-lSystem", objectFilePath, inBuildFolder "runtime_native.o", "-o", inBuildFolder moduleName]
+          callProcess "ld64.lld-9" ["-e", "_Main.main", "-lSystem", objectFilePath, inBuildFolder "runtime_native.o", "-o", inBuildFolder moduleName]
 
 
 compileEmbedded :: (MonadIO m) => String -> String -> AST.Module -> m ()
