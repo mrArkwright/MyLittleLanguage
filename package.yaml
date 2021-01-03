@@ -35,6 +35,8 @@ library:
 executable:
   main: Main.hs
   source-dirs: app
+  default-extensions:
+    - FlexibleContexts
   dependencies:
     - MyLittleLanguage
 
