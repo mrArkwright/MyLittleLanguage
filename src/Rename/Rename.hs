@@ -15,12 +15,16 @@ import RuntimeSystem
 
 
 
-rename :: MonadError Error m => Parse.Module -> m [GlobalDefinition]
-rename module_ = evalStateT' (Rename MM.empty []) $ do
+rename :: MonadError Error m => Target -> Parse.Module -> m [GlobalDefinition]
+rename target module_ = evalStateT' (Rename MM.empty []) $ do
 
-  mapM_ importBuiltin $ M.toList $ fmap (\(type_, _) -> type_) builtins
-  mapM_ importBuiltin $ M.toList nativeRuntimeSymbols
-  mapM_ importBuiltin $ M.toList arduinoRuntimeSymbols
+  mapM_ importGlobalSymbol $ M.toList $ fmap (\(type_, _) -> type_) builtins
+
+  case target of
+    NativeTarget -> mapM_ importGlobalSymbol $ M.toList nativeRuntimeSymbols
+    ArduinoTarget _ _ -> mapM_ importGlobalSymbol $ M.toList arduinoRuntimeSymbols
+    _ -> return ()
+
   importModuleVerbatim module_
   
   renameModule module_
@@ -28,8 +32,8 @@ rename module_ = evalStateT' (Rename MM.empty []) $ do
   gets rename_definitions
 
 
-importBuiltin :: (MonadState Rename m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
-importBuiltin (symbol @ (GlobalSymbol name symbolPath), _) = addToSymbolTable (Parse.Symbol name symbolPath) (SymbolGlobal symbol)
+importGlobalSymbol :: (MonadState Rename m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
+importGlobalSymbol (symbol @ (GlobalSymbol name symbolPath), _) = addToSymbolTable (Parse.Symbol name symbolPath) (SymbolGlobal symbol)
 
 
 importModuleVerbatim :: (MonadState Rename m, MonadError Error m) => Parse.Module -> m ()

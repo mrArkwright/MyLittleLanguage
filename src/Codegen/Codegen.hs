@@ -36,15 +36,15 @@ codegen :: MonadError Error m => Target -> LLVM.Module -> [GlobalDefinition] -> 
 codegen target astModule definitions = evalStateT' (Codegen astModule M.empty) $ do
 
   case target of
-    NativeTarget -> mapM_ importLibraryBuiltin $ M.toList nativeRuntimeSymbols
-    ArduinoTarget _ _ -> mapM_ importLibraryBuiltin $ M.toList arduinoRuntimeSymbols
+    NativeTarget -> mapM_ importGlobalSymbol $ M.toList nativeRuntimeSymbols
+    ArduinoTarget _ _ -> mapM_ importGlobalSymbol $ M.toList arduinoRuntimeSymbols
     _ -> return ()
 
   mapM_ importGlobalDefinition definitions
   
   case target of
-    NativeTarget -> mapM_ codegenLibraryBuiltin $ M.toList nativeRuntimeSymbols
-    ArduinoTarget _ _ -> mapM_ codegenLibraryBuiltin $ M.toList arduinoRuntimeSymbols
+    NativeTarget -> mapM_ codegenExternalGlobalSymbol $ M.toList nativeRuntimeSymbols
+    ArduinoTarget _ _ -> mapM_ codegenExternalGlobalSymbol $ M.toList arduinoRuntimeSymbols
     _ -> return ()
    
   mapM_ codegenGlobalDefinition definitions
@@ -52,8 +52,8 @@ codegen target astModule definitions = evalStateT' (Codegen astModule M.empty) $
   gets codegen_module
 
 
-importLibraryBuiltin :: (MonadState Codegen m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
-importLibraryBuiltin (symbol, type_) = do
+importGlobalSymbol :: (MonadState Codegen m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
+importGlobalSymbol (symbol, type_) = do
   let symbol' = SymbolGlobal $ symbol
   operand <- constantOperand symbol' type_
   addToSymbolTable symbol' type_ operand
@@ -67,8 +67,8 @@ importGlobalDefinition definition = do
   addToSymbolTable symbol type_ operand
 
 
-codegenLibraryBuiltin :: (MonadState Codegen m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
-codegenLibraryBuiltin (symbol, type_) = case type_ of
+codegenExternalGlobalSymbol :: (MonadState Codegen m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
+codegenExternalGlobalSymbol (symbol, type_) = case type_ of
 
   TypeFunction parameterTypes resultType -> do
     let namedParameters = map (\(parameterType, i) -> Parameter ("x" ++ show i) parameterType) $ zipWithIndex parameterTypes

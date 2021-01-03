@@ -119,16 +119,18 @@ processFile options fileName = do
 process :: (MonadError Error m, MonadIO m) => Options -> String -> AST.Module -> String -> m AST.Module
 process options name astModule source = do
 
+  let target = _target options
+
   parsedModule <- parse name source
   when (_debug options) $ printParsed parsedModule
 
-  renamedDefinitions <- rename parsedModule
+  renamedDefinitions <- rename target parsedModule
   when (_debug options) $ printRenamed renamedDefinitions
 
-  typedDefinitions <- typecheck renamedDefinitions
+  typedDefinitions <- typecheck target renamedDefinitions
   when (_debug options) $ printTypechecked typedDefinitions
 
-  generatedModule <- codegen (_target options) astModule typedDefinitions
+  generatedModule <- codegen target astModule typedDefinitions
   when (_debug options) $ printCodeGenerated generatedModule
 
   return generatedModule

@@ -17,20 +17,23 @@ import RuntimeSystem
 type SymbolTable = M.Map Symbol Type
 
 
-typecheck :: MonadError Error m => [Rename.GlobalDefinition] -> m [GlobalDefinition]
-typecheck definitions = evalStateT' M.empty $ do
+typecheck :: MonadError Error m => Target -> [Rename.GlobalDefinition] -> m [GlobalDefinition]
+typecheck target definitions = evalStateT' M.empty $ do
 
-  mapM_ importBuiltin $ M.toList $ fmap (\(type_, _) -> type_) builtins
-  mapM_ importBuiltin $ M.toList nativeRuntimeSymbols
-  mapM_ importBuiltin $ M.toList arduinoRuntimeSymbols
+  mapM_ importGlobalSymbol $ M.toList $ fmap (\(type_, _) -> type_) builtins
+
+  case target of
+    NativeTarget -> mapM_ importGlobalSymbol $ M.toList nativeRuntimeSymbols
+    ArduinoTarget _ _ -> mapM_ importGlobalSymbol $ M.toList arduinoRuntimeSymbols
+    _ -> return ()
 
   mapM_ importDefinition $ definitions
 
   mapM typecheckGlobalDefinition definitions
 
 
-importBuiltin :: (MonadState SymbolTable m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
-importBuiltin (symbol, type_) = do
+importGlobalSymbol :: (MonadState SymbolTable m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
+importGlobalSymbol (symbol, type_) = do
   let symbol' = SymbolGlobal symbol
   modify $ M.insert symbol' type_
 
