@@ -3,6 +3,9 @@ OBJCOPY=~/Library/Arduino15/packages/arduino/tools/avr-gcc/7.3.0-atmel3.6.1-ardu
 
 DEVICE=$(shell cat arduino_device)
 
+.PHONY: all
+all: build/arduino_blinky.hex
+
 build/arduino_blinky.hex: build/arduino_blinky.elf
 	$(OBJCOPY) -O ihex -R .eeprom build/arduino_blinky.elf build/arduino_blinky.hex
 
