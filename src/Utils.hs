@@ -1,11 +1,8 @@
-module Misc where
+module Utils where
 
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Except
-
-import Text.Parsec (try, optionMaybe)
-import Text.Parsec.String (Parser)
 
 
 
@@ -62,17 +59,3 @@ inBuildFolder path = buildFolder ++ "/" ++ path
 
 locDescription :: Loc -> String
 locDescription (FileLineLocation sourceName lineNumber) = sourceName ++ ", line " ++ show lineNumber ++ ": "
-
-
-parseEither :: Parser a -> Parser b -> Parser (Either a b)
-parseEither parseA parseB = do
-
-  parsedA <- optionMaybe $ try parseA
-
-  case parsedA of
-
-    Just parsedA' -> return $ Left parsedA'
-
-    Nothing -> do
-      parsedB <- parseB
-      return $ Right parsedB

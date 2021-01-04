@@ -2,7 +2,7 @@ module Parse.Syntax where
 
 import Data.List
 
-import Misc
+import Utils
 
 
 type Name = String

@@ -15,7 +15,7 @@ import qualified Data.ByteString.Short as B (fromShort)
 
 import qualified LLVM.AST as AST
 
-import Misc
+import Utils
 import Parse.Parse
 import qualified Parse.Syntax as Parse
 import Rename.Rename

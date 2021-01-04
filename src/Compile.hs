@@ -23,7 +23,7 @@ import qualified LLVM.AST as AST
 import LLVM.Transforms ( Pass(..) )
 
 import Paths_MyLittleLanguage
-import Misc
+import Utils
 
 
 

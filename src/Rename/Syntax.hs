@@ -2,7 +2,7 @@ module Rename.Syntax (module Parse.Syntax, module Rename.Syntax) where
 
 import Data.List
 
-import Misc
+import Utils
 import Parse.Syntax (Name, SymbolPath, Type(..), Parameter(..))
 
 

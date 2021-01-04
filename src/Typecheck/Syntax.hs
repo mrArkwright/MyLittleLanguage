@@ -1,6 +1,6 @@
 module Typecheck.Syntax (module Rename.Syntax, module Typecheck.Syntax) where
 
-import Misc
+import Utils
 import Rename.Syntax (Name, SymbolPath, Type(..), Parameter(..), Symbol(..), GlobalSymbol(..), LocalSymbol(..))
 
 

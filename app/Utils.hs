@@ -1,4 +1,4 @@
-module Misc where
+module Utils where
 
 import Control.Monad.Except
 

@@ -7,7 +7,7 @@ import Control.Monad.Except
 import qualified Data.Map as M
 import qualified Data.MultiMap as MM
 
-import Misc
+import Utils
 import qualified Parse.Syntax as Parse
 import Rename.Syntax
 import Codegen.Builtins

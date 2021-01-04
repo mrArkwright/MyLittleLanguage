@@ -1,4 +1,4 @@
-module Codegen.Lib where
+module Codegen.Utils where
 
 import Control.Monad.Except
 
@@ -11,7 +11,7 @@ import qualified LLVM.AST.AddrSpace as LLVM
 import qualified LLVM.AST.Constant as LLVM.Constant
 import qualified LLVM.AST.Type as LLVM
 
-import Misc
+import Utils
 import Typecheck.Syntax
 
 

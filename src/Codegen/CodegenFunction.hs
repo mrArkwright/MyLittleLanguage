@@ -15,9 +15,9 @@ import qualified LLVM.AST.Float as LLVM
 import qualified LLVM.AST.CallingConvention as LLVM
 import LLVM.AST.Instruction ( Named( (:=) ) )
 
-import Misc
+import Utils
 import Typecheck.Syntax
-import Codegen.Lib
+import Codegen.Utils
 import Codegen.Builtins
 
 

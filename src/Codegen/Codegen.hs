@@ -11,10 +11,10 @@ import qualified LLVM.AST as LLVM
 import qualified LLVM.AST.Global as LLVM
 import qualified LLVM.AST.DataLayout as LLVM
 
-import Misc
+import Utils
 import RuntimeSystem (nativeRuntimeSymbols, arduinoRuntimeSymbols)
 import Typecheck.Syntax
-import Codegen.Lib
+import Codegen.Utils
 import Codegen.CodegenFunction
 
 

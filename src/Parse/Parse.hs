@@ -10,25 +10,16 @@ import Text.Parsec hiding (parse)
 import qualified Text.Parsec as P (parse)
 import Text.Parsec.String (Parser)
 import Text.Parsec.Expr
-import Text.Parsec.Error
 
-import Misc
+import Utils
 import Parse.Syntax
+import Parse.Utils
 import qualified Parse.Lex as Lex
 
 
 
 parse :: MonadError Error m => String -> String -> m Module
 parse name source = liftEither $ left parseErrorToError $ P.parse mainParser name source
-
-
-parseErrorToError :: ParseError -> Error
-parseErrorToError parseError =
-
-  let loc = sourcePosToLoc $ errorPos parseError in
-  let errorMessage = showErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input" (errorMessages parseError) in
-
-  (errorMessage, Just loc)
 
 
 mainParser :: Parser Module
@@ -336,12 +327,3 @@ parseDefinitionStatement = do
   definition <- parseDefinition
 
   return $ StatementDefinition definition loc
-
-
-
---------------------------------------------------------------------------------
--- misc
---------------------------------------------------------------------------------
-
-sourcePosToLoc :: SourcePos -> Loc
-sourcePosToLoc sourcePos = FileLineLocation (sourceName sourcePos) (sourceLine sourcePos)

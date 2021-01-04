@@ -6,7 +6,7 @@ import Control.Monad.Except
 import System.Console.GetOpt
 
 import qualified Top
-import Misc
+import Utils
 
 
 data Options = Options {
