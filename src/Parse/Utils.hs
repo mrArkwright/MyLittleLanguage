@@ -21,14 +21,20 @@ parseEither parseA parseB = do
       return $ Right parsedB
 
 
-sourcePosToLoc :: SourcePos -> Loc
-sourcePosToLoc sourcePos = FileLineLocation (sourceName sourcePos) (sourceLine sourcePos)
+sourcePosToLoc :: SourcePos -> SourcePos -> Loc
+sourcePosToLoc startPos endPos = Loc {
+    loc_sourceName = sourceName startPos,
+    loc_startLine = sourceLine startPos,
+    loc_startColumn = sourceColumn startPos,
+    loc_endLine = sourceLine endPos,
+    loc_endColumn = sourceColumn endPos
+  }
 
 
 parseErrorToError :: ParseError -> Error
 parseErrorToError parseError =
 
-  let loc = sourcePosToLoc $ errorPos parseError in
+  let loc = sourcePosToLoc (errorPos parseError) (errorPos parseError) in
   let errorMessage = showErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input" (errorMessages parseError) in
 
   (errorMessage, Just loc)

@@ -11,8 +11,15 @@ data Target
   | EmbeddedTarget String String
   | ArduinoTarget String String
 
-data Loc = FileLineLocation String Int
-  deriving (Eq, Ord, Show)
+
+data Loc = Loc {
+    loc_sourceName :: String,
+    loc_startLine :: Int,
+    loc_startColumn :: Int,
+    loc_endLine :: Int,
+    loc_endColumn :: Int
+  } deriving (Eq, Ord, Show)
+
 
 type Error = (String, Maybe Loc)
 
@@ -58,4 +65,4 @@ inBuildFolder path = buildFolder ++ "/" ++ path
 
 
 locDescription :: Loc -> String
-locDescription (FileLineLocation sourceName lineNumber) = sourceName ++ ", line " ++ show lineNumber ++ ": "
+locDescription loc = (loc_sourceName loc) ++ " line " ++ show (loc_startLine loc) ++ ", column " ++ show (loc_startColumn loc) ++ " to line " ++ show (loc_endLine loc) ++ ", column " ++ show (loc_endColumn loc) ++ ": "

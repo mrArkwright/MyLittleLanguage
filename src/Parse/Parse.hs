@@ -109,7 +109,7 @@ parseFunctionType = do
 parseDefinition :: Parser Definition
 parseDefinition = try $ do
 
-  loc <- sourcePosToLoc <$> getPosition
+  startPos <- getPosition
 
   Lex.parseReserved "let"
 
@@ -124,6 +124,9 @@ parseDefinition = try $ do
   Lex.parseReserved "="
 
   expression <- parseExpression
+
+  endPos <- getPosition
+  let loc = sourcePosToLoc startPos endPos
 
   return $ Definition name parameters resultType expression loc
 
@@ -177,9 +180,12 @@ binaryOperator name assoc = Infix (parseBinaryOperator name) assoc
 parseBinaryOperator :: String -> Parser (Expression -> Expression -> Expression)
 parseBinaryOperator name = do
 
-  loc <- sourcePosToLoc <$> getPosition
+  startPos <- getPosition
 
   Lex.parseReservedOperator name
+
+  endPos <- getPosition
+  let loc = sourcePosToLoc startPos endPos
 
   let symbol = Symbol name []
   return $ \x y -> Call symbol [x, y] loc
@@ -188,54 +194,78 @@ parseBinaryOperator name = do
 parseUnit :: Parser Expression
 parseUnit = do
 
-  loc <- sourcePosToLoc <$> getPosition
+  startPos <- getPosition
 
   Lex.parseReserved "()"
+
+  endPos <- getPosition
+  let loc = sourcePosToLoc startPos endPos
+
   return $ Unit loc
 
 
 parsePointer :: Parser Expression
 parsePointer = do
 
-  loc <- sourcePosToLoc <$> getPosition
+  startPos <- getPosition
 
   value <- Lex.parsePointer
+
+  endPos <- getPosition
+  let loc = sourcePosToLoc startPos endPos
+
   return $ Pointer value loc
 
 
 parseInteger :: Parser Expression
 parseInteger = do
 
-  loc <- sourcePosToLoc <$> getPosition
+  startPos <- getPosition
 
   value <- Lex.parseInteger
+
+  endPos <- getPosition
+  let loc = sourcePosToLoc startPos endPos
+
   return $ Int value loc
 
 
 parseInteger8 :: Parser Expression
 parseInteger8 = do
 
-  loc <- sourcePosToLoc <$> getPosition
+  startPos <- getPosition
 
   value <- Lex.parseInteger8
+
+  endPos <- getPosition
+  let loc = sourcePosToLoc startPos endPos
+
   return $ Int8 value loc
 
 
 parseFloat :: Parser Expression
 parseFloat = do
 
-  loc <- sourcePosToLoc <$> getPosition
+  startPos <- getPosition
 
   value <- Lex.parseFloat
+
+  endPos <- getPosition
+  let loc = sourcePosToLoc startPos endPos
+
   return $ Float value loc
 
 
 parseSymbolReference :: Parser Expression
 parseSymbolReference = do
 
-  loc <- sourcePosToLoc <$> getPosition
+  startPos <- getPosition
 
   name <- Lex.parseIdentifier
+
+  endPos <- getPosition
+  let loc = sourcePosToLoc startPos endPos
+
   let symbol = Symbol name []
   return $ SymbolReference symbol loc
 
@@ -243,13 +273,16 @@ parseSymbolReference = do
 parseCall :: Parser Expression
 parseCall = do
 
-  loc <- sourcePosToLoc <$> getPosition
+  startPos <- getPosition
 
   symbolPath <- parseSymbolPath
 
   name <- Lex.parseIdentifier
 
   args <- Lex.parseParens $ Lex.parseCommaSep parseExpression
+
+  endPos <- getPosition
+  let loc = sourcePosToLoc startPos endPos
 
   let symbol = Symbol name symbolPath
   return $ Call symbol args loc
@@ -258,7 +291,7 @@ parseCall = do
 parseIf :: Parser Expression
 parseIf = do
 
-  loc <- sourcePosToLoc <$> getPosition
+  startPos <- getPosition
 
   Lex.parseReserved "if"
 
@@ -271,6 +304,9 @@ parseIf = do
   Lex.parseReserved "else"
 
   ifFalse <- parseExpression
+
+  endPos <- getPosition
+  let loc = sourcePosToLoc startPos endPos
 
   return $ If condition ifTrue ifFalse loc
 
@@ -288,13 +324,16 @@ parseSymbolPath = many $ try $ do
 parseDoBlock :: Parser Expression
 parseDoBlock = do
 
-  loc <- sourcePosToLoc <$> getPosition
+  startPos <- getPosition
 
   Lex.parseReserved "do"
 
   statements <- many parseStatement
 
   Lex.parseReserved "end"
+
+  endPos <- getPosition
+  let loc = sourcePosToLoc startPos endPos
 
   return $ Do statements loc
 
@@ -312,9 +351,12 @@ parseStatement = try parseExpressionStatement
 parseExpressionStatement :: Parser Statement
 parseExpressionStatement = do
 
-  loc <- sourcePosToLoc <$> getPosition
+  startPos <- getPosition
 
   expression <- parseExpression
+
+  endPos <- getPosition
+  let loc = sourcePosToLoc startPos endPos
 
   return $ StatementExpression expression loc
 
@@ -322,8 +364,11 @@ parseExpressionStatement = do
 parseDefinitionStatement :: Parser Statement
 parseDefinitionStatement = do
 
-  loc <- sourcePosToLoc <$> getPosition
+  startPos <- getPosition
 
   definition <- parseDefinition
+
+  endPos <- getPosition
+  let loc = sourcePosToLoc startPos endPos
 
   return $ StatementDefinition definition loc
