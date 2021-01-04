@@ -1,4 +1,4 @@
-module Top (repl, processFile, Options (..), defaultOptions, Target (..)) where
+module Top (repl, compileFile, Options (..), defaultOptions, Target (..), Compile.compileRuntime) where
 
 import Data.Maybe
 import Data.List
@@ -23,7 +23,7 @@ import qualified Rename.Syntax as Rename
 import Typecheck.Typecheck
 import qualified Typecheck.Syntax as Typecheck
 import Codegen.Codegen
-import Compile
+import qualified Compile
 
 
 
@@ -44,8 +44,8 @@ defaultOptions = Options {
 -- REPL
 --------------------------------------------------------------------------------
 
-repl :: (MonadIO m) => Options -> m ()
-repl options = do
+repl :: MonadIO m => m ()
+repl = do
 
   liftIO $ putStrLn "---- MyLittleLanguage REPL ----"
 
@@ -67,7 +67,7 @@ repl options = do
         Just input' -> do
 
           let moduleName = BC.unpack $ B.fromShort $ AST.moduleName module_'
-          module_'' <- runExceptT $ process options moduleName module_' input'
+          module_'' <- runExceptT $ compileModule defaultOptions moduleName module_' input'
 
           case module_'' of
 
@@ -80,11 +80,11 @@ repl options = do
 
 
 --------------------------------------------------------------------------------
--- process file
+-- compile file
 --------------------------------------------------------------------------------
 
-processFile :: (MonadIO m) => Options -> String -> m Bool
-processFile options fileName = do
+compileFile :: MonadIO m => Options -> String -> m Bool
+compileFile options fileName = do
 
   source <- liftIO $ readFile fileName
 
@@ -97,7 +97,7 @@ processFile options fileName = do
 
   let module_ = newModule moduleName fileName triple
 
-  module_' <- runExceptT $ process options fileName module_ source
+  module_' <- runExceptT $ compileModule options fileName module_ source
 
   case module_' of
 
@@ -107,7 +107,7 @@ processFile options fileName = do
       return False
 
     Right module_'' -> do
-      compile (_target options) module_''
+      Compile.compile (_target options) module_''
       return True
 
 
@@ -116,8 +116,8 @@ processFile options fileName = do
 -- common
 --------------------------------------------------------------------------------
 
-process :: (MonadError Error m, MonadIO m) => Options -> String -> AST.Module -> String -> m AST.Module
-process options name astModule source = do
+compileModule :: (MonadError Error m, MonadIO m) => Options -> String -> AST.Module -> String -> m AST.Module
+compileModule options name astModule source = do
 
   let target = _target options
 
@@ -153,19 +153,21 @@ printParsed module_ = do
     liftIO $ mapM_ (putStrLn . (++ "\n") . show) definitions
     liftIO $ mapM_ (printModule modulePath') submodules
 
+
 printRenamed :: MonadIO m => [Rename.GlobalDefinition] -> m ()
 printRenamed definitions = do
   liftIO $ putStrLn "---- Renamed ----"
   liftIO $ mapM_ (putStrLn . (++ "\n") . show) definitions
+
 
 printTypechecked :: MonadIO m => [Typecheck.GlobalDefinition] -> m ()
 printTypechecked definitions = do
   liftIO $ putStrLn "---- Typecheckd ----"
   liftIO $ mapM_ (putStrLn . (++ "\n") . show) definitions
 
+
 printCodeGenerated :: MonadIO m => AST.Module -> m ()
 printCodeGenerated module_ = do
   liftIO $ putStrLn "---- Module ----"
   liftIO $ print module_
   liftIO $ putStrLn ""
-

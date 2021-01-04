@@ -22,7 +22,7 @@ main = hspec $ do
 
 
 specifyCompileExample :: String -> Target -> Spec
-specifyCompileExample name target = specify ("compile " ++ name) $ withCurrentDirectory ("examples/" ++ name) $ do
+specifyCompileExample name target = specify ("compile example " ++ name) $ withCurrentDirectory ("examples/" ++ name) $ do
 
   let files = fmap ("build/" ++) [name ++ ".ll", name ++ ".s", name ++ ".o"]
   mapM_ removeFileIfExists files
@@ -31,7 +31,7 @@ specifyCompileExample name target = specify ("compile " ++ name) $ withCurrentDi
       _target = target
     }
 
-  success <- processFile options (name ++ ".mll")
+  success <- compileFile options (name ++ ".mll")
 
   shouldBe success True
 
