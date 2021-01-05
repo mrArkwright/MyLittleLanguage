@@ -3,7 +3,7 @@ module Rename.Syntax (module Parse.Syntax, module Rename.Syntax) where
 import Data.List
 
 import Utils
-import Parse.Syntax (Name, SymbolPath, Type(..), Parameter(..))
+import Parse.Syntax (Name, SymbolPath, Type(..), Parameter(..), Literal(..))
 
 
 data GlobalSymbol = GlobalSymbol {
@@ -76,10 +76,7 @@ data Statement
 
 data Expression
   = Unit Loc
-  | Pointer Integer Loc
-  | Int Integer Loc
-  | Int8 Integer Loc
-  | Float Double Loc
+  | LiteralExpression Literal Loc
   | SymbolReference Symbol Loc
   | Call Symbol [Expression] Loc
   | If Expression Expression Expression Loc

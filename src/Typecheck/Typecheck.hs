@@ -96,13 +96,9 @@ typecheckLocalValueDefinition (Rename.LocalValueDefinition symbol type_ expressi
 typecheckExpression :: (MonadState SymbolTable m, MonadError Error m) => Rename.Expression -> m (Expression, Type)
 typecheckExpression (Rename.Unit loc) = return (Unit TypeUnit loc, TypeUnit)
 
-typecheckExpression (Rename.Pointer value loc) = return (Pointer value TypePointer loc, TypePointer)
-
-typecheckExpression (Rename.Int value loc) = return (Int value TypeInt loc, TypeInt)
-
-typecheckExpression (Rename.Int8 value loc) = return (Int8 value TypeInt8 loc, TypeInt8)
-
-typecheckExpression (Rename.Float value loc) = return (Float value TypeFloat loc, TypeFloat)
+typecheckExpression (Rename.LiteralExpression value loc) = do
+    let type_ = literalType value
+    return (LiteralExpression value type_ loc, type_)
 
 typecheckExpression (Rename.SymbolReference symbol loc) = do
 
@@ -155,6 +151,13 @@ typecheckExpression (Rename.Do statements loc) = do
   case lastMaybe statementTypes of
    Just lastStatementType -> return (Do typedStatements lastStatementType loc, lastStatementType)
    Nothing -> throwError ("(Typecheck) empty do block", Just loc)
+
+
+literalType :: Literal -> Type
+literalType (Pointer _) = TypePointer
+literalType (Int _) = TypeInt
+literalType (Int8 _) = TypeInt8
+literalType (Float _) = TypeFloat
 
 
 findSymbol :: MonadState SymbolTable m => Symbol -> m (Maybe Type)

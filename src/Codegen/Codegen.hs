@@ -8,7 +8,7 @@ import qualified Data.ByteString.Short as B (toShort)
 import qualified Data.ByteString.Char8 as BC
 
 import qualified LLVM.AST as LLVM
-import qualified LLVM.AST.Global as LLVM
+import qualified LLVM.AST.Global as LLVM.Global
 import qualified LLVM.AST.DataLayout as LLVM
 
 import Utils
@@ -56,15 +56,21 @@ importGlobalSymbol :: (MonadState Codegen m, MonadError Error m) => (GlobalSymbo
 importGlobalSymbol (symbol, type_) = do
   let symbol' = SymbolGlobal $ symbol
   operand <- constantOperand symbol' type_
-  addToSymbolTable symbol' type_ operand
+  addToSymbolTable symbol' $ SymbolProperties type_ operand False
 
 
 importGlobalDefinition :: (MonadState Codegen m, MonadError Error m) => GlobalDefinition -> m ()
-importGlobalDefinition definition = do
-  let symbol = SymbolGlobal $ globalDefinitionSymbol definition
-  let type_ = globalDefinitionType definition
+importGlobalDefinition (GlobalDefinitionValue definition) = do
+  let symbol = SymbolGlobal $ globalValueDefinition_symbol definition
+  let type_ = globalValueDefinition_type definition
+  operand <- constantPointerOperand symbol type_
+  addToSymbolTable symbol $ SymbolProperties type_ operand True
+
+importGlobalDefinition (GlobalDefinitionFunction definition) = do
+  let symbol = SymbolGlobal $ functionDefinition_symbol definition
+  let type_ = TypeFunction (map parameter_type $ functionDefinition_parameters definition) (functionDefinition_resultType definition)
   operand <- constantOperand symbol type_
-  addToSymbolTable symbol type_ operand
+  addToSymbolTable symbol $ SymbolProperties type_ operand False
 
 
 codegenExternalGlobalSymbol :: (MonadState Codegen m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
@@ -79,7 +85,20 @@ codegenExternalGlobalSymbol (symbol, type_) = case type_ of
 
 codegenGlobalDefinition :: (MonadState Codegen m, MonadError Error m) => GlobalDefinition -> m ()
 codegenGlobalDefinition (GlobalDefinitionValue definition) = do
-  throwError ("(Codegen) codegenDefinition not implemented for global values.", Just $ globalValueDefinition_loc definition)
+
+  llvmType <- typeToLlvmType $ globalValueDefinition_type definition
+  llvmConstant <- case globalValueDefinition_expression definition of
+    LiteralExpression value _ _ -> return $ codegenLiteral value
+    expression -> throwError ("(Codegen) global values with non-literal initialization are not supported yet", Just $ expressionLoc expression)
+
+  let llvmDefinition = LLVM.GlobalDefinition $ LLVM.globalVariableDefaults {
+    LLVM.Global.name = LLVM.Name (B.toShort $ BC.pack $ show $ globalValueDefinition_symbol definition),
+    LLVM.Global.isConstant = True,
+    LLVM.Global.type' = llvmType,
+    LLVM.Global.initializer = Just llvmConstant
+  }
+
+  addToModuleDefinitions llvmDefinition
 
 codegenGlobalDefinition (GlobalDefinitionFunction definition) = do
 
@@ -103,10 +122,10 @@ addGlobalFunction symbol parameters resultType basicBlocks = do
   resultType' <- typeToLlvmType resultType
 
   let llvmDefinition = LLVM.GlobalDefinition $ LLVM.functionDefaults {
-    LLVM.name        = LLVM.Name (B.toShort $ BC.pack $ show symbol),
-    LLVM.parameters  = (parameters', False),
-    LLVM.returnType  = resultType',
-    LLVM.basicBlocks = basicBlocks
+    LLVM.Global.name        = LLVM.Name (B.toShort $ BC.pack $ show symbol),
+    LLVM.Global.parameters  = (parameters', False),
+    LLVM.Global.returnType  = resultType',
+    LLVM.Global.basicBlocks = basicBlocks
   }
 
   addToModuleDefinitions llvmDefinition
@@ -124,10 +143,10 @@ addToModuleDefinitions definition = do
   modify $ \s -> s { codegen_module = module_ { LLVM.moduleDefinitions = moduleDefinitions -:+ definition } }
 
 
-addToSymbolTable :: MonadState Codegen m => Symbol -> Type -> LLVM.Operand -> m ()
-addToSymbolTable symbol type_ operand = do
+addToSymbolTable :: MonadState Codegen m => Symbol -> SymbolProperties -> m ()
+addToSymbolTable symbol symbolProperties = do
   symbolTable <- gets codegen_symbolTable
-  modify $ \s -> s { codegen_symbolTable = M.insert symbol (type_, operand) symbolTable }
+  modify $ \s -> s { codegen_symbolTable = M.insert symbol symbolProperties symbolTable }
 
 
 data Codegen = Codegen {

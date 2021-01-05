@@ -22,6 +22,13 @@ constantOperand symbol type_ = do
   return $ LLVM.ConstantOperand $ LLVM.Constant.GlobalReference type_' (LLVM.Name $ B.toShort $ BC.pack $ show symbol)
 
 
+constantPointerOperand :: MonadError Error m => Symbol -> Type -> m LLVM.Operand
+constantPointerOperand symbol type_ = do
+  type_' <- typeToLlvmType type_
+  let type_'' = LLVM.PointerType type_' (LLVM.AddrSpace 0)
+  return $ LLVM.ConstantOperand $ LLVM.Constant.GlobalReference type_'' (LLVM.Name $ B.toShort $ BC.pack $ show symbol)
+
+
 typeToLlvmType :: MonadError Error m => Type -> m LLVM.Type
 typeToLlvmType TypeUnit = return LLVM.VoidType
 typeToLlvmType TypePointer = return $ LLVM.PointerType (LLVM.IntegerType 32) (LLVM.AddrSpace 0)
@@ -35,4 +42,20 @@ typeToLlvmType (TypeFunction parameterTypes resultType) = do
   return $ LLVM.ptr $ LLVM.FunctionType resultType' parameterTypes' False
 
 
-type SymbolTable = M.Map Symbol (Type, LLVM.Operand)
+expressionLoc :: Expression -> Loc
+expressionLoc (Unit _ loc) = loc
+expressionLoc (LiteralExpression _ _ loc) = loc
+expressionLoc (SymbolReference _ _ loc) = loc
+expressionLoc (Call _ _ _ loc) = loc
+expressionLoc (If _ _ _ _ loc) = loc
+expressionLoc (Do _ _ loc) = loc
+
+
+type SymbolTable = M.Map Symbol SymbolProperties
+
+
+data SymbolProperties = SymbolProperties {
+    symbolProperties_type_ :: Type,
+    symbolProperties_operand :: LLVM.Operand,
+    symbolProperties_indirectAccess :: Bool -- specifies wether the operand needs to be accesses indirectly (i.e. with a load instruction)
+  } deriving Show

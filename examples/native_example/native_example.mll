@@ -94,30 +94,22 @@ let foo(i: Float): Float = i +. 3.0
 
 module Out begin
 
+  let dash: Int = 45
+  let newline: Int = 10
+
   let printDashs(): Unit = do
-
-    let printDash(): Unit = do
-      let dash: Int = 45
-      printChar(dash)
-    end
-
+    let printDash(): Unit = printChar(dash)
     Ops.repeat(printDash, 80)
-    printNewline()
-
+    printChar(newline)
   end
 
   let printFloatLine(f: Float): Unit = do
     printFloat(f)
-    printNewline()
+    printChar(newline)
   end
 
   let printIntLine(i: Int): Unit = do
     printInt(i)
-    printNewline()
-  end
-
-  let printNewline(): Unit = do
-    let newline: Int = 10
     printChar(newline)
   end
 

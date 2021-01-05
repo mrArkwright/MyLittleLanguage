@@ -1,4 +1,4 @@
-module Codegen.CodegenFunction (codegenFunction) where
+module Codegen.CodegenFunction (codegenFunction, codegenLiteral) where
 
 import Control.Monad.State
 import Control.Monad.Except
@@ -65,17 +65,10 @@ addParameter parameter = do
 codegenExpression :: (MonadState CodegenFunction m, MonadError Error m) => Expression -> m (Maybe LLVM.Operand)
 codegenExpression (Unit _ _) = return Nothing
 
-codegenExpression (Pointer value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.Constant.IntToPtr (LLVM.Constant.Int 32 value) (LLVM.PointerType (LLVM.IntegerType 32) (LLVM.AddrSpace 0))
-
-codegenExpression (Int value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.Constant.Int 32 value
-
-codegenExpression (Int8 value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.Constant.Int 8 value
-
-codegenExpression (Float value _ _) = return $ Just $ LLVM.ConstantOperand $ LLVM.Constant.Float (LLVM.Double value)
+codegenExpression (LiteralExpression value _ _) = return $ Just $ LLVM.ConstantOperand $ codegenLiteral value
 
 codegenExpression (SymbolReference symbol _ loc) = do
-  resolvedSymbol <- resolveSymbol symbol
-  (_, operand) <- maybeToError resolvedSymbol ("(Codegen) reference to unkown symbol: " ++ show symbol, Just loc)
+  operand <- accessSymbol symbol loc
   return $ Just operand
 
 codegenExpression (Call symbol argumentExpressions _ loc) = do
@@ -109,9 +102,9 @@ codegenExpression (Call symbol argumentExpressions _ loc) = do
       symbolTable <- gets codegenFunction_symbolTable
 
       (resultType, function) <- case M.lookup symbol symbolTable of
-        Just (TypeFunction _ resultType', operand') -> return (resultType', operand')
+        Just (SymbolProperties (TypeFunction _ resultType') operand' _) -> return (resultType', operand')
         Just _ -> throwError ("(Codegen) Call to non-function symbol: " ++ show symbol, Just loc)
-        _ -> throwError ("(Codegen) Call to unknown symbol: " ++ show symbol, Just loc)
+        Nothing -> throwError ("(Codegen) Call to unknown symbol: " ++ show symbol, Just loc)
 
       resultType' <- typeToLlvmType resultType
 
@@ -145,7 +138,7 @@ codegenExpression (If condition ifTrue ifFalse ifType loc) = do
 
     (Nothing, Nothing) -> return Nothing
 
-    _ -> throwError ("(Codegen) branches of if construct don't match", Just loc)
+    _ -> throwError ("(Codegen) branches of if-expression do not match", Just loc)
 
 
 codegenExpression (Do statements _ _) = do
@@ -165,6 +158,13 @@ codegenStatement (StatementDefinition definition _ _) = do
   addToLocalSymbolTable symbol type_ result
 
   return Nothing
+
+
+codegenLiteral :: Literal -> LLVM.Constant.Constant
+codegenLiteral (Pointer value) = LLVM.Constant.IntToPtr (LLVM.Constant.Int 32 value) (LLVM.PointerType (LLVM.IntegerType 32) (LLVM.AddrSpace 0))
+codegenLiteral (Int value) = LLVM.Constant.Int 32 value
+codegenLiteral (Int8 value) = LLVM.Constant.Int 8 value
+codegenLiteral (Float value) = LLVM.Constant.Float (LLVM.Double value)
 
 
 
@@ -203,21 +203,6 @@ addPhi resultType incoming =
   addNamedInstruction resultType $ LLVM.Phi resultType incoming' []
 
 
-addNamedInstruction :: MonadState CodegenFunction m => LLVM.Type -> LLVM.Instruction -> m LLVM.Operand
-addNamedInstruction instrType instruction = do
-
-  n <- nextRegisterNumber
-  let ref = LLVM.UnName n
-
-  addInstruction $ ref := instruction
-
-  return $ LLVM.LocalReference instrType ref
-
-
-addUnnamedInstruction :: MonadState CodegenFunction m => LLVM.Instruction -> m ()
-addUnnamedInstruction instruction = addInstruction $ LLVM.Do instruction
-
-
 addReturnValue :: MonadState CodegenFunction m => Maybe LLVM.Operand -> m ()
 addReturnValue val = addTerminator $ LLVM.Do $ LLVM.Ret val []
 
@@ -230,13 +215,21 @@ addReturnValue val = addTerminator $ LLVM.Do $ LLVM.Ret val []
 addToLocalSymbolTable :: MonadState CodegenFunction m => Symbol -> Type -> LLVM.Operand -> m ()
 addToLocalSymbolTable symbol type_ operand = do
   symbolTable <- gets codegenFunction_symbolTable
-  modify $ \s -> s { codegenFunction_symbolTable = M.insert symbol (type_, operand) symbolTable }
+  modify $ \s -> s { codegenFunction_symbolTable = M.insert symbol (SymbolProperties type_ operand False) symbolTable }
 
 
-resolveSymbol :: MonadState CodegenFunction m => Symbol -> m (Maybe (Type, LLVM.Operand))
-resolveSymbol name = do
+accessSymbol :: (MonadState CodegenFunction m, MonadError Error m) => Symbol -> Loc -> m LLVM.Operand
+accessSymbol symbol loc = do
   symbolTable <- gets codegenFunction_symbolTable
-  return $ M.lookup name symbolTable
+
+  case M.lookup symbol symbolTable of
+    Just (SymbolProperties _ operand False) -> return operand
+
+    Just (SymbolProperties type_ operand True) -> do
+      type_' <- typeToLlvmType type_
+      addNamedInstruction type_' (LLVM.Load False operand Nothing 0 [])
+
+    Nothing -> throwError ("(Codegen) reference to unkown symbol: " ++ show symbol, Just loc)
 
 
 addNewBasicBlock :: MonadState CodegenFunction m => String -> m ()
@@ -250,6 +243,21 @@ addBasicBlock :: MonadState CodegenFunction m => BasicBlock -> m ()
 addBasicBlock basicBlock = do
   basicBlocks <- gets codegenFunction_basicBlocks
   modify $ \s -> s { codegenFunction_basicBlocks = basicBlocks -:+ basicBlock }
+
+
+addNamedInstruction :: MonadState CodegenFunction m => LLVM.Type -> LLVM.Instruction -> m LLVM.Operand
+addNamedInstruction instrType instruction = do
+
+  n <- nextRegisterNumber
+  let ref = LLVM.UnName n
+
+  addInstruction $ ref := instruction
+
+  return $ LLVM.LocalReference instrType ref
+
+
+addUnnamedInstruction :: MonadState CodegenFunction m => LLVM.Instruction -> m ()
+addUnnamedInstruction instruction = addInstruction $ LLVM.Do instruction
 
 
 addInstruction :: MonadState CodegenFunction m => LLVM.Named LLVM.Instruction -> m ()

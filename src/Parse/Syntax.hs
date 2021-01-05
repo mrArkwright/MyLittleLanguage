@@ -53,12 +53,17 @@ data Statement
 
 data Expression
   = Unit Loc
-  | Pointer Integer Loc
-  | Int Integer Loc
-  | Int8 Integer Loc
-  | Float Double Loc
+  | LiteralExpression Literal Loc
   | SymbolReference Symbol Loc
   | Call Symbol [Expression] Loc
   | If Expression Expression Expression Loc
   | Do [Statement] Loc
+  deriving (Eq, Ord, Show)
+
+
+data Literal
+  = Pointer Integer
+  | Int Integer
+  | Int8 Integer
+  | Float Double
   deriving (Eq, Ord, Show)

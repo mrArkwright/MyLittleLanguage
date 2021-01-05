@@ -1,7 +1,7 @@
 module Typecheck.Syntax (module Rename.Syntax, module Typecheck.Syntax) where
 
 import Utils
-import Rename.Syntax (Name, SymbolPath, Type(..), Parameter(..), Symbol(..), GlobalSymbol(..), LocalSymbol(..))
+import Rename.Syntax (Name, SymbolPath, Type(..), Parameter(..), Symbol(..), GlobalSymbol(..), LocalSymbol(..), Literal(..))
 
 
 
@@ -33,14 +33,6 @@ data FunctionDefinition = FunctionDefinition {
 data GlobalDefinition = GlobalDefinitionValue GlobalValueDefinition | GlobalDefinitionFunction FunctionDefinition
   deriving (Eq, Ord, Show)
 
-globalDefinitionSymbol :: GlobalDefinition -> GlobalSymbol
-globalDefinitionSymbol (GlobalDefinitionValue definition) = globalValueDefinition_symbol definition
-globalDefinitionSymbol (GlobalDefinitionFunction definition) = functionDefinition_symbol definition
-
-globalDefinitionType :: GlobalDefinition -> Type
-globalDefinitionType (GlobalDefinitionValue definition) = globalValueDefinition_type definition
-globalDefinitionType (GlobalDefinitionFunction definition) = TypeFunction (map parameter_type $ functionDefinition_parameters definition) (functionDefinition_resultType definition)
-
 
 data Statement
   = StatementExpression Expression Type Loc
@@ -50,10 +42,7 @@ data Statement
 
 data Expression
   = Unit Type Loc
-  | Pointer Integer Type Loc
-  | Int Integer Type Loc
-  | Int8 Integer Type Loc
-  | Float Double Type Loc
+  | LiteralExpression Literal Type Loc
   | SymbolReference Symbol Type Loc
   | Call Symbol [Expression] Type Loc
   | If Expression Expression Expression Type Loc
