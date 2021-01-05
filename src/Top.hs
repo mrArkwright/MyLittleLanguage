@@ -52,30 +52,32 @@ repl = do
   let moduleName = "<stdin>"
   let module_ = newModule moduleName moduleName Nothing
 
-  liftIO $ runInputT defaultSettings $ loop module_ where
+  liftIO $ runInputT defaultSettings $ repl' module_
 
-    loop module_' = do
 
-      input <- getInputLine "➜ "
+repl' :: MonadException m => AST.Module -> InputT m ()
+repl' module_ = do
 
-      case input of
+  input <- getInputLine "➜ "
 
-        Nothing    -> outputStrLn "Goodbye."
+  case input of
+    Nothing -> replGoodbye
+    Just ":q" -> replGoodbye
+    Just input' -> do
+      let moduleName = BC.unpack $ B.fromShort $ AST.moduleName module_
+      module_' <- runExceptT $ compileModule defaultOptions moduleName module_ input'
 
-        Just ":q"  -> outputStrLn "Goodbye."
+      case module_' of
+        Left (err, loc) -> do
+          let locString = fromMaybe "" $ fmap locDescription loc
+          outputStrLn $ "[" ++ color Red "error" ++ "] " ++ locString ++ err
+          repl' module_
 
-        Just input' -> do
+        Right module_'' -> repl' module_''
 
-          let moduleName = BC.unpack $ B.fromShort $ AST.moduleName module_'
-          module_'' <- runExceptT $ compileModule defaultOptions moduleName module_' input'
 
-          case module_'' of
-
-            Left err -> do
-              liftIO $ print err
-              loop module_'
-
-            Right module_''' -> loop module_'''
+replGoodbye :: MonadException m => InputT m ()
+replGoodbye = outputStrLn "Goodbye."
 
 
 
