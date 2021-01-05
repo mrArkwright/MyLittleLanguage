@@ -1,4 +1,1 @@
-resolver: nightly-2020-01-01
-
-extra-deps:
-  - pretty-terminal-0.1.0.0
+resolver: lts-16.27
