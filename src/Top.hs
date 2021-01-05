@@ -10,9 +10,6 @@ import Control.Monad.Except
 import System.Console.Haskeline
 import System.Console.Pretty
 
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Short as B (fromShort)
-
 import qualified LLVM.AST as AST
 
 import Utils
@@ -49,8 +46,7 @@ repl = do
 
   liftIO $ putStrLn "---- MyLittleLanguage REPL ----"
 
-  let moduleName = "<stdin>"
-  let module_ = newModule moduleName moduleName Nothing
+  let module_ = newModule replModuleName replSourceName Nothing
 
   liftIO $ runInputT defaultSettings $ repl' module_
 
@@ -62,10 +58,11 @@ repl' module_ = do
 
   case input of
     Nothing -> replGoodbye
+
     Just ":q" -> replGoodbye
+
     Just input' -> do
-      let moduleName = BC.unpack $ B.fromShort $ AST.moduleName module_
-      module_' <- runExceptT $ compileModule defaultOptions moduleName module_ input'
+      module_' <- runExceptT $ compileModule defaultOptions replSourceName module_ input'
 
       case module_' of
         Left (err, loc) -> do
@@ -78,6 +75,14 @@ repl' module_ = do
 
 replGoodbye :: MonadException m => InputT m ()
 replGoodbye = outputStrLn "Goodbye."
+
+
+replModuleName :: String
+replModuleName = "Main"
+
+
+replSourceName :: String
+replSourceName = "<interactive>"
 
 
 
@@ -119,11 +124,11 @@ compileFile options fileName = do
 --------------------------------------------------------------------------------
 
 compileModule :: (MonadError Error m, MonadIO m) => Options -> String -> AST.Module -> String -> m AST.Module
-compileModule options name astModule source = do
+compileModule options sourceName astModule source = do
 
   let target = _target options
 
-  parsedModule <- parse name source
+  parsedModule <- parse sourceName source
   when (_debug options) $ printParsed parsedModule
 
   renamedDefinitions <- rename target parsedModule

@@ -24,9 +24,9 @@ import Codegen.CodegenFunction
 --------------------------------------------------------------------------------
 
 newModule :: String -> String -> Maybe String -> LLVM.Module
-newModule name fileName targetTriple = LLVM.defaultModule {
+newModule name sourceName targetTriple = LLVM.defaultModule {
     LLVM.moduleName = B.toShort $ BC.pack name,
-    LLVM.moduleSourceFileName = B.toShort $ BC.pack fileName,
+    LLVM.moduleSourceFileName = B.toShort $ BC.pack sourceName,
     LLVM.moduleDataLayout = Just $ LLVM.defaultDataLayout LLVM.LittleEndian,
     LLVM.moduleTargetTriple = (B.toShort . BC.pack) <$> targetTriple
   }
@@ -74,13 +74,12 @@ importGlobalDefinition (GlobalDefinitionFunction definition) = do
 
 
 codegenExternalGlobalSymbol :: (MonadState Codegen m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
-codegenExternalGlobalSymbol (symbol, type_) = case type_ of
+codegenExternalGlobalSymbol (symbol, TypeFunction parameterTypes resultType) = do
+  let namedParameters = map (\(parameterType, i) -> Parameter ("x" ++ show i) parameterType) $ zipWithIndex parameterTypes
+  addGlobalFunction symbol namedParameters resultType []
 
-  TypeFunction parameterTypes resultType -> do
-    let namedParameters = map (\(parameterType, i) -> Parameter ("x" ++ show i) parameterType) $ zipWithIndex parameterTypes
-    addGlobalFunction symbol namedParameters resultType []
-
-  _ -> throwError ("(Codegen) codegenLibraryBuiltin not implemented for type " ++ show type_, Nothing)
+codegenExternalGlobalSymbol (_, type_) =
+  throwError ("(Codegen) codegenLibraryBuiltin not implemented for type " ++ show type_, Nothing)
 
 
 codegenGlobalDefinition :: (MonadState Codegen m, MonadError Error m) => GlobalDefinition -> m ()

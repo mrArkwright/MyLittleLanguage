@@ -6,7 +6,7 @@ import Control.Monad.Except
 import Data.Functor.Identity
 import Data.Either
 
-import Text.Parsec hiding (parse)
+import Text.Parsec hiding (parse, sourceName)
 import qualified Text.Parsec as P (parse)
 import Text.Parsec.String (Parser)
 import Text.Parsec.Expr
@@ -19,7 +19,7 @@ import qualified Parse.Lex as Lex
 
 
 parse :: MonadError Error m => String -> String -> m Module
-parse name source = liftEither $ left parseErrorToError $ P.parse mainParser name source
+parse sourceName source = liftEither $ left parseErrorToError $ P.parse mainParser sourceName source
 
 
 mainParser :: Parser Module
