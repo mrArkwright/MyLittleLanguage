@@ -37,4 +37,8 @@ parseErrorToError parseError =
   let loc = sourcePosToLoc (errorPos parseError) (errorPos parseError) in
   let errorMessage = showErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input" (errorMessages parseError) in
 
-  (errorMessage, Just loc)
+  (errorMessage, phase, Just loc)
+
+
+phase :: Phase
+phase = PhaseParse

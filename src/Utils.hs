@@ -21,7 +21,17 @@ data Loc = Loc {
   } deriving (Eq, Ord, Show)
 
 
-type Error = (String, Maybe Loc)
+type Error = (String, Phase, Maybe Loc)
+
+
+data Phase = PhaseParse | PhaseRename | PhaseTypecheck | PhaseCodegen | PhaseCompile
+
+instance Show Phase where
+  show PhaseParse = "Parse"
+  show PhaseRename = "Rename"
+  show PhaseTypecheck = "Typecheck"
+  show PhaseCodegen = "Codegen"
+  show PhaseCompile = "Compile"
 
 
 lastMaybe :: [a] -> Maybe a
@@ -62,7 +72,3 @@ buildFolder = "build"
 
 inBuildFolder :: String -> String
 inBuildFolder path = buildFolder ++ "/" ++ path
-
-
-locDescription :: Loc -> String
-locDescription loc = (loc_sourceName loc) ++ " line " ++ show (loc_startLine loc) ++ ", column " ++ show (loc_startColumn loc) ++ " to line " ++ show (loc_endLine loc) ++ ", column " ++ show (loc_endColumn loc) ++ ": "

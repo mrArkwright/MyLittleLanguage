@@ -7,6 +7,7 @@ import Control.Monad.Except
 import qualified Data.Map as M
 
 import Utils
+import Typecheck.Utils
 import qualified Rename.Syntax as Rename
 import Typecheck.Syntax
 import Codegen.Builtins
@@ -47,7 +48,7 @@ typecheckGlobalDefinition (Rename.GlobalDefinitionValue (Rename.GlobalValueDefin
 
   (typedExpression, expressionType) <- typecheckExpression expression
 
-  when (type_ /= expressionType) $ throwError ("(Typecheck) definition of \"" ++ show symbol ++ "\": expected " ++ show type_ ++ " but got " ++ show expressionType, Just loc)
+  when (type_ /= expressionType) $ throwError ("definition of \"" ++ show symbol ++ "\": expected " ++ show type_ ++ " but got " ++ show expressionType, phase, Just loc)
 
   return $ GlobalDefinitionValue $ GlobalValueDefinition symbol type_ typedExpression loc
 
@@ -57,7 +58,7 @@ typecheckGlobalDefinition (Rename.GlobalDefinitionFunction (Rename.FunctionDefin
 
   (typedExpression, expressionType) <- typecheckExpression expression
 
-  when (resultType /= expressionType) $ throwError ("(Typecheck) definition of \"" ++ show symbol ++ "\": expected " ++ show resultType ++ " but got " ++ show expressionType, Just loc)
+  when (resultType /= expressionType) $ throwError ("definition of \"" ++ show symbol ++ "\": expected " ++ show resultType ++ " but got " ++ show expressionType, phase, Just loc)
 
   return $ GlobalDefinitionFunction $ FunctionDefinition symbol parameters resultType typedExpression loc
 
@@ -88,7 +89,7 @@ typecheckLocalValueDefinition (Rename.LocalValueDefinition symbol type_ expressi
 
   (typedExpression, expressionType) <- typecheckExpression expression
 
-  when (type_ /= expressionType) $ throwError ("(Typecheck) definition of \"" ++ show symbol ++ "\": expected " ++ show type_ ++ " but got " ++ show expressionType, Just loc)
+  when (type_ /= expressionType) $ throwError ("definition of \"" ++ show symbol ++ "\": expected " ++ show type_ ++ " but got " ++ show expressionType, phase, Just loc)
 
   return $ LocalValueDefinition symbol type_ typedExpression loc
 
@@ -106,7 +107,7 @@ typecheckExpression (Rename.SymbolReference symbol loc) = do
 
   case symbolType of
     Just symbolType' -> return (SymbolReference symbol symbolType' loc, symbolType')
-    Nothing -> throwError ("(Typecheck) symbol \"" ++ show symbol ++ "\" not found", Just loc)
+    Nothing -> throwError ("symbol \"" ++ show symbol ++ "\" not found", phase, Just loc)
 
 typecheckExpression (Rename.Call symbol arguments loc) = do
 
@@ -114,32 +115,32 @@ typecheckExpression (Rename.Call symbol arguments loc) = do
 
   (parameterTypes, resultType) <- case symbolType of
     Just (TypeFunction parameterTypes' resultType') -> return (parameterTypes', resultType')
-    Just _ -> throwError ("(Typecheck) can't call non-function symbol: " ++ show symbol, Just loc)
-    Nothing -> throwError ("(Typecheck) function not found: " ++ show symbol, Just loc)
+    Just _ -> throwError ("can't call non-function symbol: " ++ show symbol, phase, Just loc)
+    Nothing -> throwError ("function not found: " ++ show symbol, phase, Just loc)
 
   (typedArguments, argumentTypes) <- fmap unzip $ mapM typecheckExpression arguments
 
   let numberArgumentsExpected = length parameterTypes
   let numberArgumentsPassed = length argumentTypes
-  when (numberArgumentsExpected /= numberArgumentsPassed) $ throwError ("(Typecheck) call of function " ++ show symbol ++ ": wrong number of arguments. expected: " ++ show numberArgumentsExpected ++ ", passed: " ++ show numberArgumentsPassed, Just loc)
+  when (numberArgumentsExpected /= numberArgumentsPassed) $ throwError ("call of function " ++ show symbol ++ ": wrong number of arguments. expected: " ++ show numberArgumentsExpected ++ ", passed: " ++ show numberArgumentsPassed, phase, Just loc)
 
   mapM_ typecheckParameter $ zip parameterTypes argumentTypes
 
   return (Call symbol typedArguments resultType loc, resultType) where
 
     typecheckParameter :: (MonadState SymbolTable m, MonadError Error m) => (Type, Type) -> m ()
-    typecheckParameter (parameterType, argumentType) = when (parameterType /= argumentType) $ throwError ("(Typecheck) call of function" ++ show symbol ++ ": expected " ++ show parameterType ++ " but got " ++ show argumentType, Just loc)
+    typecheckParameter (parameterType, argumentType) = when (parameterType /= argumentType) $ throwError ("call of function" ++ show symbol ++ ": expected " ++ show parameterType ++ " but got " ++ show argumentType, phase, Just loc)
 
 typecheckExpression (Rename.If conditionExpression trueExpression falseExpression loc) = do
 
   (typedConditionExpression, conditionExpressionType) <- typecheckExpression conditionExpression
 
-  when (conditionExpressionType /= TypeBoolean) $ throwError ("(Typecheck) condition expression must be of type " ++ show TypeBoolean ++ " but has type " ++ show conditionExpressionType, Just loc)
+  when (conditionExpressionType /= TypeBoolean) $ throwError ("condition expression must be of type " ++ show TypeBoolean ++ " but has type " ++ show conditionExpressionType, phase, Just loc)
 
   (typedTrueExpression, trueExpressionType) <- typecheckExpression trueExpression
   (typedFalseExpression, falseExpressionType) <- typecheckExpression falseExpression
 
-  when (trueExpressionType /= falseExpressionType) $ throwError ("(Typecheck) types of if branches differ: " ++ show trueExpressionType ++ " and " ++ show falseExpressionType, Just loc)
+  when (trueExpressionType /= falseExpressionType) $ throwError ("types of if branches differ: " ++ show trueExpressionType ++ " and " ++ show falseExpressionType, phase, Just loc)
 
   return (If typedConditionExpression typedTrueExpression typedFalseExpression trueExpressionType loc, trueExpressionType)
 
@@ -150,7 +151,7 @@ typecheckExpression (Rename.Do statements loc) = do
 
   case lastMaybe statementTypes of
    Just lastStatementType -> return (Do typedStatements lastStatementType loc, lastStatementType)
-   Nothing -> throwError ("(Typecheck) empty do block", Just loc)
+   Nothing -> throwError ("empty do block", phase, Just loc)
 
 
 literalType :: Literal -> Type

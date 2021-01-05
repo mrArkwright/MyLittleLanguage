@@ -85,7 +85,7 @@ codegenExpression (Call symbol argumentExpressions _ loc) = do
 
       (argument1, argument2) <- case arguments of
         [argument1', argument2'] -> return (argument1', argument2')
-        _ -> throwError ("(Codegen) Wrong number of arguments for builtin " ++ show symbol, Just loc)
+        _ -> throwError ("Wrong number of arguments for builtin " ++ show symbol, phase, Just loc)
 
       if (resultType /= TypeUnit) then do
         resultType' <- typeToLlvmType resultType
@@ -95,7 +95,7 @@ codegenExpression (Call symbol argumentExpressions _ loc) = do
         return Nothing
 
     Just _ ->
-      throwError ("(Codegen) Call to non-function builtin: " ++ show symbol, Just loc)
+      throwError ("Call to non-function builtin: " ++ show symbol, phase, Just loc)
 
     Nothing -> do
 
@@ -103,8 +103,8 @@ codegenExpression (Call symbol argumentExpressions _ loc) = do
 
       (resultType, function) <- case M.lookup symbol symbolTable of
         Just (SymbolProperties (TypeFunction _ resultType') operand' _) -> return (resultType', operand')
-        Just _ -> throwError ("(Codegen) Call to non-function symbol: " ++ show symbol, Just loc)
-        Nothing -> throwError ("(Codegen) Call to unknown symbol: " ++ show symbol, Just loc)
+        Just _ -> throwError ("Call to non-function symbol: " ++ show symbol, phase, Just loc)
+        Nothing -> throwError ("Call to unknown symbol: " ++ show symbol, phase, Just loc)
 
       resultType' <- typeToLlvmType resultType
 
@@ -138,7 +138,7 @@ codegenExpression (If condition ifTrue ifFalse ifType loc) = do
 
     (Nothing, Nothing) -> return Nothing
 
-    _ -> throwError ("(Codegen) branches of if-expression do not match", Just loc)
+    _ -> throwError ("branches of if-expression do not match", phase, Just loc)
 
 
 codegenExpression (Do statements _ _) = do
@@ -229,7 +229,7 @@ accessSymbol symbol loc = do
       type_' <- typeToLlvmType type_
       addNamedInstruction type_' (LLVM.Load False operand Nothing 0 [])
 
-    Nothing -> throwError ("(Codegen) reference to unkown symbol: " ++ show symbol, Just loc)
+    Nothing -> throwError ("reference to unkown symbol: " ++ show symbol, phase, Just loc)
 
 
 addNewBasicBlock :: MonadState CodegenFunction m => String -> m ()
@@ -326,7 +326,7 @@ data CodegenFunction = CodegenFunction {
 
 basicBlockToLLVMBasicBlock :: MonadError Error m => BasicBlock -> m LLVM.BasicBlock
 basicBlockToLLVMBasicBlock (BasicBlock name instructions terminator) = do
-  terminator' <- maybeToError terminator ("(Codegen) Block has no terminator: " ++ (show name), Nothing)
+  terminator' <- maybeToError terminator ("Block has no terminator: " ++ (show name), phase, Nothing)
   return $ LLVM.BasicBlock (LLVM.Name $ B.toShort $ BC.pack name) instructions terminator'
 
 

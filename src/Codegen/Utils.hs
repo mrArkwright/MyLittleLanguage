@@ -59,3 +59,7 @@ data SymbolProperties = SymbolProperties {
     symbolProperties_operand :: LLVM.Operand,
     symbolProperties_indirectAccess :: Bool -- specifies wether the operand needs to be accesses indirectly (i.e. with a load instruction)
   } deriving Show
+
+
+phase :: Phase
+phase = PhaseCodegen

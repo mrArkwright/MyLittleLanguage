@@ -79,7 +79,7 @@ codegenExternalGlobalSymbol (symbol, TypeFunction parameterTypes resultType) = d
   addGlobalFunction symbol namedParameters resultType []
 
 codegenExternalGlobalSymbol (_, type_) =
-  throwError ("(Codegen) codegenLibraryBuiltin not implemented for type " ++ show type_, Nothing)
+  throwError ("codegenLibraryBuiltin not implemented for type " ++ show type_, phase, Nothing)
 
 
 codegenGlobalDefinition :: (MonadState Codegen m, MonadError Error m) => GlobalDefinition -> m ()
@@ -88,7 +88,7 @@ codegenGlobalDefinition (GlobalDefinitionValue definition) = do
   llvmType <- typeToLlvmType $ globalValueDefinition_type definition
   llvmConstant <- case globalValueDefinition_expression definition of
     LiteralExpression value _ _ -> return $ codegenLiteral value
-    expression -> throwError ("(Codegen) global values with non-literal initialization are not supported yet", Just $ expressionLoc expression)
+    expression -> throwError ("global values with non-literal initialization are not supported yet", phase, Just $ expressionLoc expression)
 
   let llvmDefinition = LLVM.GlobalDefinition $ LLVM.globalVariableDefaults {
     LLVM.Global.name = LLVM.Name (B.toShort $ BC.pack $ show $ globalValueDefinition_symbol definition),

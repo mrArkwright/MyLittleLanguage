@@ -8,6 +8,7 @@ import qualified Data.Map as M
 import qualified Data.MultiMap as MM
 
 import Utils
+import Rename.Utils
 import qualified Parse.Syntax as Parse
 import Rename.Syntax
 import Codegen.Builtins
@@ -66,7 +67,7 @@ importDefinition importPath symbolPath definition = do
   let symbol = SymbolGlobal $ GlobalSymbol name symbolPath
 
   symbolTable <- gets rename_symbolTable
-  when (MM.member symbolTable importedSymbol) $ throwError ("(Rename) function \"" ++ name ++ "\" redefined", Just $ Parse.definition_loc definition)
+  when (MM.member symbolTable importedSymbol) $ throwError ("function \"" ++ name ++ "\" redefined", phase, Just $ Parse.definition_loc definition)
 
   modify $ \s -> s { rename_symbolTable = MM.insert importedSymbol symbol symbolTable }
 
@@ -138,9 +139,9 @@ renameExpression (Parse.SymbolReference symbol loc) = do
   symbolTable <- gets rename_symbolTable
 
   resolvedSymbol <- case MM.lookup symbol symbolTable of
-    [] -> throwError ("(Rename) symbol " ++ show symbol ++ " not found", Just loc)
+    [] -> throwError ("symbol " ++ show symbol ++ " not found", phase, Just loc)
     [symbol'] -> return symbol'
-    _ -> throwError ("(Rename) ambigous reference to " ++ show symbol, Just loc)
+    _ -> throwError ("ambigous reference to " ++ show symbol, phase, Just loc)
 
   return $ SymbolReference resolvedSymbol loc
 
@@ -151,9 +152,9 @@ renameExpression (Parse.Call symbol argExprs loc) = do
   symbolTable <- gets rename_symbolTable
 
   resolvedSymbol <- case MM.lookup symbol symbolTable of
-    [] -> throwError ("(Rename) function " ++ show symbol ++ " not found", Just loc)
+    [] -> throwError ("function " ++ show symbol ++ " not found", phase, Just loc)
     [symbol'] -> return symbol'
-    _ -> throwError ("(Rename) ambigous call of " ++ show symbol, Just loc)
+    _ -> throwError ("ambigous call of " ++ show symbol, phase, Just loc)
 
   return $ Call resolvedSymbol argExprs' loc
 

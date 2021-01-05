@@ -1,6 +1,5 @@
 module Top (repl, compileFile, Options (..), defaultOptions, Target (..), Compile.compileRuntime) where
 
-import Data.Maybe
 import Data.List
 
 import Control.Monad.Trans
@@ -65,9 +64,8 @@ repl' module_ = do
       module_' <- runExceptT $ compileModule defaultOptions replSourceName module_ input'
 
       case module_' of
-        Left (err, loc) -> do
-          let locString = fromMaybe "" $ fmap locDescription loc
-          outputStrLn $ "[" ++ color Red "error" ++ "] " ++ locString ++ err
+        Left err -> do
+          printError input' err
           repl' module_
 
         Right module_'' -> repl' module_''
@@ -107,10 +105,8 @@ compileFile options fileName = do
   module_' <- runExceptT $ compileModule options fileName module_ source
 
   case module_' of
-
-    Left (err, loc) -> do
-      let locString = fromMaybe "" $ fmap locDescription loc
-      liftIO $ putStrLn $ "[" ++ color Red "error" ++ "] " ++ locString ++ err
+    Left err -> do
+      printError source err
       return False
 
     Right module_'' -> do
@@ -178,3 +174,31 @@ printCodeGenerated module_ = do
   liftIO $ putStrLn "---- Module ----"
   liftIO $ print module_
   liftIO $ putStrLn ""
+
+
+printError :: MonadIO m => String -> Error -> m ()
+printError _ (err, phase, Nothing) = do
+  liftIO $ putStr $ style Bold $ color Red "error: "
+  liftIO $ putStr $ color Cyan $ "[" ++ show phase ++ "] "
+  liftIO $ putStrLn $ style Bold $ color White err
+
+printError source (err, phase, Just loc) = do
+  let startLine = loc_startLine loc
+  let endLine = loc_endLine loc
+
+  let affectedLine = (lines source) !! (startLine - 1)
+
+  let startColumn = loc_startColumn loc
+  let endColumn = if (startLine == endLine) then loc_endColumn loc else length affectedLine + 1
+
+  liftIO $ putStr $ style Bold $ loc_sourceName loc ++ ":" ++ show startLine ++ ":" ++ show startColumn
+  when (startColumn /= endColumn) $ liftIO $ putStr $ style Bold $ "-" ++ show endColumn
+  liftIO $ putStr $ style Bold ": "
+  liftIO $ putStr $ style Bold $ color Red "error: "
+  liftIO $ putStr $ color Cyan $ "[" ++ show phase ++ "] "
+  liftIO $ putStrLn $ style Bold $ color White err
+
+  liftIO $ putStrLn $ affectedLine
+
+  let errorLength = if (endColumn > startColumn) then endColumn - startColumn else 1
+  liftIO $ putStrLn $ color Yellow $ replicate (startColumn - 1) ' ' ++ replicate errorLength '^'
