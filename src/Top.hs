@@ -1,9 +1,12 @@
 module Top (repl, compileFile, Options (..), defaultOptions, Target (..), Compile.compileRuntime) where
 
+import Data.Maybe
 import Data.List
+import Data.Char
 
 import Control.Monad.Trans
 import Control.Monad.State
+import Control.Monad.Writer
 import Control.Monad.Except
 
 import System.Console.Haskeline
@@ -61,11 +64,11 @@ repl' module_ = do
     Just ":q" -> replGoodbye
 
     Just input' -> do
-      module_' <- runExceptT $ compileModule defaultOptions replSourceName module_ input'
+      module_' <- runExceptT $ compileModule defaultOptions replSourceName replModuleName module_ input'
 
       case module_' of
         Left err -> do
-          printError input' err
+          outputStrLn $ formatError input' err
           repl' module_
 
         Right module_'' -> repl' module_''
@@ -88,12 +91,13 @@ replSourceName = "<interactive>"
 -- compile file
 --------------------------------------------------------------------------------
 
-compileFile :: MonadIO m => Options -> String -> m Bool
+compileFile :: (MonadError String m, MonadIO m) => Options -> String -> m ()
 compileFile options fileName = do
 
-  source <- liftIO $ readFile fileName
+  let moduleName = fromMaybe fileName $ stripSuffix ".mll" fileName
+  when (not $ isValidModuleName moduleName) $ throwError $ "invalid module name: " ++ moduleName
 
-  let moduleName = init $ dropWhileEnd (/= '.') $ fileName
+  source <- liftIO $ readFile fileName
 
   let triple = case _target options of
                  NativeTarget -> Nothing
@@ -102,16 +106,23 @@ compileFile options fileName = do
 
   let module_ = newModule moduleName fileName triple
 
-  module_' <- runExceptT $ compileModule options fileName module_ source
+  module_' <- runExceptT $ compileModule options fileName moduleName module_ source
 
   case module_' of
     Left err -> do
-      printError source err
-      return False
+      throwError $ formatError source err
 
     Right module_'' -> do
       Compile.compile (_target options) module_''
-      return True
+
+
+isValidModuleName :: String -> Bool
+isValidModuleName moduleName = and [
+    all isAscii moduleName,
+    all isAlphaNum moduleName,
+    not $ null moduleName,
+    isUpper $ head moduleName
+  ]
 
 
 
@@ -119,12 +130,12 @@ compileFile options fileName = do
 -- common
 --------------------------------------------------------------------------------
 
-compileModule :: (MonadError Error m, MonadIO m) => Options -> String -> AST.Module -> String -> m AST.Module
-compileModule options sourceName astModule source = do
+compileModule :: (MonadError Error m, MonadIO m) => Options -> String -> String -> AST.Module -> String -> m AST.Module
+compileModule options sourceName moduleName astModule source = do
 
   let target = _target options
 
-  parsedModule <- parse sourceName source
+  parsedModule <- parse sourceName moduleName source
   when (_debug options) $ printParsed parsedModule
 
   renamedDefinitions <- rename target parsedModule
@@ -176,13 +187,13 @@ printCodeGenerated module_ = do
   liftIO $ putStrLn ""
 
 
-printError :: MonadIO m => String -> Error -> m ()
-printError _ (err, phase, Nothing) = do
-  liftIO $ putStr $ style Bold $ color Red "error: "
-  liftIO $ putStr $ color Cyan $ "[" ++ show phase ++ "] "
-  liftIO $ putStrLn $ style Bold $ color White err
+formatError :: String -> Error -> String
+formatError _ (err, phase, Nothing) = execWriter $ do
+  tell $ style Bold $ color Red "error: "
+  tell $ color Cyan $ "[" ++ show phase ++ "] "
+  tell $ style Bold $ color White err
 
-printError source (err, phase, Just loc) = do
+formatError source (err, phase, Just loc) = execWriter $ do
   let startLine = loc_startLine loc
   let endLine = loc_endLine loc
 
@@ -191,14 +202,17 @@ printError source (err, phase, Just loc) = do
   let startColumn = loc_startColumn loc
   let endColumn = if (startLine == endLine) then loc_endColumn loc else length affectedLine + 1
 
-  liftIO $ putStr $ style Bold $ loc_sourceName loc ++ ":" ++ show startLine ++ ":" ++ show startColumn
-  when (startColumn /= endColumn) $ liftIO $ putStr $ style Bold $ "-" ++ show endColumn
-  liftIO $ putStr $ style Bold ": "
-  liftIO $ putStr $ style Bold $ color Red "error: "
-  liftIO $ putStr $ color Cyan $ "[" ++ show phase ++ "] "
-  liftIO $ putStrLn $ style Bold $ color White err
+  tell $ style Bold $ loc_sourceName loc ++ ":" ++ show startLine ++ ":" ++ show startColumn
+  when (startColumn /= endColumn) $ tell $ style Bold $ "-" ++ show endColumn
+  tell $ style Bold ": "
+  tell $ style Bold $ color Red "error: "
+  tell $ color Cyan $ "[" ++ show phase ++ "] "
+  tell $ style Bold $ color White err
+  tell "\n"
 
-  liftIO $ putStrLn $ affectedLine
+  tell $ affectedLine
+  tell "\n"
 
   let errorLength = if (endColumn > startColumn) then endColumn - startColumn else 1
-  liftIO $ putStrLn $ color Yellow $ replicate (startColumn - 1) ' ' ++ replicate errorLength '^'
+  tell $ color Yellow $ replicate (startColumn - 1) ' ' ++ replicate errorLength '^'
+  tell "\n"

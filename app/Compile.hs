@@ -66,10 +66,7 @@ compile args = do
     [] -> throwError "no input files"
 
     [fileName] -> do
-      success <- Top.compileFile processOptions fileName
-      if (success) then do
-        liftIO $ putStrLn "successfully compiled!"
-        return ()
-      else throwError "compilation failed"
+      Top.compileFile processOptions fileName
+      liftIO $ putStrLn "successfully compiled!"
 
     _ -> throwError "more than one input file specified"

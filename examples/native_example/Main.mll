@@ -1,5 +1,3 @@
-// MyLittleLanguage test program
-
 let main(): Unit = do
 
   Main.Out.printDashs()

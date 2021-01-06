@@ -1,11 +1,11 @@
 .PHONY: all
-all: build/LPC810_blinky.o
+all: build/Main.o
 
 TARGET=embedded
 TRIPLE=thumbv6m-none--eabi
 CPU=cortex-m0
 
-build/LPC810_blinky.o: LPC810_blinky.mll
+build/Main.o: Main.mll
 	stack run -- compile --target $(TARGET) --triple $(TRIPLE) --cpu $(CPU) $<
 
 .PHONY: clean

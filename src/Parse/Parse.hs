@@ -18,12 +18,12 @@ import qualified Parse.Lex as Lex
 
 
 
-parse :: MonadError Error m => String -> String -> m Module
-parse sourceName source = liftEither $ left parseErrorToError $ P.parse mainParser sourceName source
+parse :: MonadError Error m => String -> String -> String -> m Module
+parse sourceName moduleName source = liftEither $ left parseErrorToError $ P.parse (mainParser moduleName) sourceName source
 
 
-mainParser :: Parser Module
-mainParser = do
+mainParser :: String -> Parser Module
+mainParser moduleName = do
 
   Lex.parseWhiteSpace
 
@@ -31,7 +31,7 @@ mainParser = do
 
   eof
 
-  return $ Module "Main" modules definitions
+  return $ Module moduleName modules definitions
 
 
 parseModuleContents :: Parser ([Module], [Definition])

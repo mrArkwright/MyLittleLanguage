@@ -1,5 +1,3 @@
-// MyLittleLanguage embedded test program
-
 let main(): Unit = do
 
   store(p0xA0002000, 1)

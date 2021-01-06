@@ -4,6 +4,8 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Except
 
+import Data.List
+
 
 
 data Target
@@ -38,6 +40,10 @@ lastMaybe :: [a] -> Maybe a
 lastMaybe [] = Nothing
 lastMaybe (x : []) = Just x
 lastMaybe (_ : xs) = lastMaybe xs
+
+
+stripSuffix :: Eq a => [a] -> [a] -> Maybe [a]
+stripSuffix suffix s = fmap reverse $ stripPrefix (reverse suffix) (reverse s)
 
 
 maybeToError :: MonadError e m => Maybe a -> e -> m a

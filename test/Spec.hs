@@ -3,6 +3,9 @@ module Main where
 import Prelude
 
 import Control.Exception
+import Control.Monad.Except
+
+import Data.Either
 
 import System.Directory
 import System.IO.Error
@@ -24,15 +27,17 @@ main = hspec $ do
 specifyCompileExample :: String -> Target -> Spec
 specifyCompileExample name target = specify ("compile example " ++ name) $ withCurrentDirectory ("examples/" ++ name) $ do
 
-  let files = fmap ("build/" ++) [name ++ ".ll", name ++ ".s", name ++ ".o"]
-  mapM_ removeFileIfExists files
-
   let options = Top.defaultOptions {
       _target = target
     }
 
-  success <- compileFile options (name ++ ".mll")
+  result <- runExceptT $ compileFile options "Main.mll"
 
+  case result of
+    Left err -> putStrLn err
+    Right _ -> return ()
+
+  let success = isRight result
   shouldBe success True
 
 
