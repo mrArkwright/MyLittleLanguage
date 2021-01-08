@@ -21,14 +21,14 @@ type SymbolTable = M.Map Symbol Type
 typecheck :: MonadError Error m => Target -> [Rename.GlobalDefinition] -> m [GlobalDefinition]
 typecheck target definitions = evalStateT' M.empty $ do
 
-  mapM_ importGlobalSymbol $ M.toList $ fmap (\(type_, _) -> type_) builtins
+  mapM_ importGlobalSymbol $ M.toList $ fmap fst builtins
 
   case target of
     NativeTarget -> mapM_ importGlobalSymbol $ M.toList nativeRuntimeSymbols
     ArduinoTarget _ _ -> mapM_ importGlobalSymbol $ M.toList arduinoRuntimeSymbols
     _ -> return ()
 
-  mapM_ importDefinition $ definitions
+  mapM_ importDefinition definitions
 
   mapM typecheckGlobalDefinition definitions
 
@@ -118,7 +118,7 @@ typecheckExpression (Rename.Call symbol arguments loc) = do
     Just _ -> throwError ("can't call non-function symbol: " ++ show symbol, phase, Just loc)
     Nothing -> throwError ("function not found: " ++ show symbol, phase, Just loc)
 
-  (typedArguments, argumentTypes) <- fmap unzip $ mapM typecheckExpression arguments
+  (typedArguments, argumentTypes) <- mapAndUnzipM typecheckExpression arguments
 
   let numberArgumentsExpected = length parameterTypes
   let numberArgumentsPassed = length argumentTypes

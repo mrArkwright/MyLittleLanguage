@@ -87,9 +87,9 @@ codegenExpression (Call symbol argumentExpressions _ loc) = do
         [argument1', argument2'] -> return (argument1', argument2')
         _ -> throwError ("Wrong number of arguments for builtin " ++ show symbol, phase, Just loc)
 
-      if (resultType /= TypeUnit) then do
+      if resultType /= TypeUnit then do
         resultType' <- typeToLlvmType resultType
-        Just <$> (addNamedInstruction resultType' $ builtin' argument1 argument2)
+        Just <$> addNamedInstruction resultType' (builtin' argument1 argument2)
       else do
         addUnnamedInstruction $ builtin' argument1 argument2
         return Nothing
@@ -326,7 +326,7 @@ data CodegenFunction = CodegenFunction {
 
 basicBlockToLLVMBasicBlock :: MonadError Error m => BasicBlock -> m LLVM.BasicBlock
 basicBlockToLLVMBasicBlock (BasicBlock name instructions terminator) = do
-  terminator' <- maybeToError terminator ("Block has no terminator: " ++ (show name), phase, Nothing)
+  terminator' <- maybeToError terminator ("Block has no terminator: " ++ show name, phase, Nothing)
   return $ LLVM.BasicBlock (LLVM.Name $ B.toShort $ BC.pack name) instructions terminator'
 
 

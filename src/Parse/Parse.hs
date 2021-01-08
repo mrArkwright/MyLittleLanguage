@@ -37,7 +37,7 @@ mainParser moduleName = do
 parseModuleContents :: Parser ([Module], [Definition])
 parseModuleContents = do
   (defs, submodules) <- fmap partitionEithers $ many $ parseEither parseDefinition parseModule
-  return $ (submodules, defs)
+  return (submodules, defs)
 
 
 parseModule :: Parser Module

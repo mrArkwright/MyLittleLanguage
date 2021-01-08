@@ -28,7 +28,7 @@ newModule name sourceName targetTriple = LLVM.defaultModule {
     LLVM.moduleName = B.toShort $ BC.pack name,
     LLVM.moduleSourceFileName = B.toShort $ BC.pack sourceName,
     LLVM.moduleDataLayout = Just $ LLVM.defaultDataLayout LLVM.LittleEndian,
-    LLVM.moduleTargetTriple = (B.toShort . BC.pack) <$> targetTriple
+    LLVM.moduleTargetTriple = B.toShort . BC.pack <$> targetTriple
   }
 
 
@@ -54,7 +54,7 @@ codegen target astModule definitions = evalStateT' (Codegen astModule M.empty) $
 
 importGlobalSymbol :: (MonadState Codegen m, MonadError Error m) => (GlobalSymbol, Type) -> m ()
 importGlobalSymbol (symbol, type_) = do
-  let symbol' = SymbolGlobal $ symbol
+  let symbol' = SymbolGlobal symbol
   operand <- constantOperand symbol' type_
   addToSymbolTable symbol' $ SymbolProperties type_ operand False
 

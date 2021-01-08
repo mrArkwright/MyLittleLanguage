@@ -23,7 +23,7 @@ import qualified Text.Parsec.Token as Tok
 
 
 parsePointer :: Parser Integer
-parsePointer = (Tok.lexeme lexer) parsePointer' <?> "pointer"
+parsePointer = Tok.lexeme lexer parsePointer' <?> "pointer"
 
 
 parsePointer' :: Parser Integer
@@ -38,7 +38,7 @@ parseInteger = Tok.integer lexer
 
 
 parseInteger8 :: Parser Integer
-parseInteger8 = (Tok.lexeme lexer) parseInteger8' <?> "integer8"
+parseInteger8 = Tok.lexeme lexer parseInteger8' <?> "integer8"
 
 parseInteger8' :: Parser Integer
 parseInteger8' = do

@@ -1,6 +1,6 @@
 module Rename.Syntax (module Parse.Syntax, module Rename.Syntax) where
 
-import Data.List
+import Data.List (intercalate)
 
 import Utils
 import Parse.Syntax (Name, SymbolPath, Type(..), Parameter(..), Literal(..))
@@ -12,7 +12,7 @@ data GlobalSymbol = GlobalSymbol {
   } deriving (Eq, Ord)
 
 instance Show GlobalSymbol where
-  show symbol = intercalate "." $ (globalSymbol_path symbol) -:+ (globalSymbol_name symbol)
+  show symbol = intercalate "." $ globalSymbol_path symbol -:+ globalSymbol_name symbol
 
 
 data LocalSymbol = LocalSymbol {

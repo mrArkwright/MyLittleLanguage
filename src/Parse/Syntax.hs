@@ -1,6 +1,6 @@
 module Parse.Syntax where
 
-import Data.List
+import Data.List (intercalate)
 
 import Utils
 

@@ -91,7 +91,7 @@ compileRuntime NativeTarget = liftIO $ do
   cpu <- getHostCPUName
 
   runtimePath <- getDataFileName "runtime/runtime_native.ll"
-  callProcess "llc-9" ["-mtriple=" ++ (BC.unpack $ B.fromShort triple), "-mcpu=" ++ (BC.unpack cpu), "-filetype=obj", runtimePath, "-o", inBuildFolder "runtime_native.o"]
+  callProcess "llc-9" ["-mtriple=" ++ BC.unpack (B.fromShort triple), "-mcpu=" ++ BC.unpack cpu, "-filetype=obj", runtimePath, "-o", inBuildFolder "runtime_native.o"]
 
 compileRuntime (EmbeddedTarget _ _) = return ()
 

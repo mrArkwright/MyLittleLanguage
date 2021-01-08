@@ -4,7 +4,7 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Except
 
-import Data.List
+import Data.List (stripPrefix)
 
 
 
@@ -38,7 +38,7 @@ instance Show Phase where
 
 lastMaybe :: [a] -> Maybe a
 lastMaybe [] = Nothing
-lastMaybe (x : []) = Just x
+lastMaybe [x] = Just x
 lastMaybe (_ : xs) = lastMaybe xs
 
 

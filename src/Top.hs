@@ -1,13 +1,14 @@
 module Top (repl, compileFile, Options (..), defaultOptions, Target (..), Compile.compileRuntime) where
 
 import Data.Maybe
-import Data.List
+import Data.List (intercalate)
 import Data.Char
 
 import Control.Monad.Trans
 import Control.Monad.State
 import Control.Monad.Writer
 import Control.Monad.Except
+import Control.Monad.Catch
 
 import System.Console.Haskeline
 import System.Console.Pretty
@@ -53,7 +54,7 @@ repl = do
   liftIO $ runInputT defaultSettings $ repl' module_
 
 
-repl' :: MonadException m => AST.Module -> InputT m ()
+repl' :: (MonadIO m, MonadMask m) => AST.Module -> InputT m ()
 repl' module_ = do
 
   input <- getInputLine "➜ "
@@ -74,7 +75,7 @@ repl' module_ = do
         Right module_'' -> repl' module_''
 
 
-replGoodbye :: MonadException m => InputT m ()
+replGoodbye :: MonadIO m => InputT m ()
 replGoodbye = outputStrLn "Goodbye."
 
 
@@ -95,7 +96,7 @@ compileFile :: (MonadError String m, MonadIO m) => Options -> String -> m ()
 compileFile options fileName = do
 
   let moduleName = fromMaybe fileName $ stripSuffix ".mll" fileName
-  when (not $ isValidModuleName moduleName) $ throwError $ "invalid module name: " ++ moduleName
+  unless (isValidModuleName moduleName) $ throwError $ "invalid module name: " ++ moduleName
 
   source <- liftIO $ readFile fileName
 
@@ -197,10 +198,10 @@ formatError source (err, phase, Just loc) = execWriter $ do
   let startLine = loc_startLine loc
   let endLine = loc_endLine loc
 
-  let affectedLine = (lines source) !! (startLine - 1)
+  let affectedLine = lines source !! (startLine - 1)
 
   let startColumn = loc_startColumn loc
-  let endColumn = if (startLine == endLine) then loc_endColumn loc else length affectedLine + 1
+  let endColumn = if startLine == endLine then loc_endColumn loc else length affectedLine + 1
 
   tell $ style Bold $ loc_sourceName loc ++ ":" ++ show startLine ++ ":" ++ show startColumn
   when (startColumn /= endColumn) $ tell $ style Bold $ "-" ++ show endColumn
@@ -210,9 +211,9 @@ formatError source (err, phase, Just loc) = execWriter $ do
   tell $ style Bold $ color White err
   tell "\n"
 
-  tell $ affectedLine
+  tell affectedLine
   tell "\n"
 
-  let errorLength = if (endColumn > startColumn) then endColumn - startColumn else 1
+  let errorLength = if endColumn > startColumn then endColumn - startColumn else 1
   tell $ color Yellow $ replicate (startColumn - 1) ' ' ++ replicate errorLength '^'
   tell "\n"
