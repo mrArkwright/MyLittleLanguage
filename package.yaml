@@ -27,17 +27,16 @@ dependencies:
   - llvm-hs-pure
   - llvm-hs
 
+default-extensions:
+  - FlexibleContexts
+
 library:
   source-dirs: src
   exposed-modules: Top
-  default-extensions:
-    - FlexibleContexts
 
 executable:
   main: Main.hs
   source-dirs: app
-  default-extensions:
-    - FlexibleContexts
   dependencies:
     - MyLittleLanguage
 
@@ -48,4 +47,3 @@ tests:
     dependencies:
       - MyLittleLanguage
       - hspec
-
