@@ -1,4 +1,4 @@
-module Compile (compile) where
+module Main.CompileRuntime (compileRuntime) where
 
 import Control.Monad.Trans
 import Control.Monad.Except
@@ -6,11 +6,10 @@ import Control.Monad.Except
 import System.Console.GetOpt
 
 import qualified Top
-import Utils
+import Main.Utils
 
 
 data Options = Options {
-    _debug :: Bool,
     _target :: String,
     _triple :: Maybe String,
     _cpu :: Maybe String
@@ -19,7 +18,6 @@ data Options = Options {
 
 defaultOptions :: Options
 defaultOptions = Options {
-    _debug = Top._debug Top.defaultOptions,
     _target = "native",
     _triple = Nothing,
     _cpu = Nothing
@@ -28,17 +26,16 @@ defaultOptions = Options {
 
 optionDescriptions :: [OptDescr (Options -> Options)]
 optionDescriptions = [
-    Option ['d'] ["debug"] (NoArg (\opts -> opts { _debug = True })) "debug mode",
     Option [] ["target"] (ReqArg (\target opts -> opts { _target = target }) "<arg>") "",
     Option [] ["triple"] (ReqArg (\triple opts -> opts { _triple = Just triple }) "<arg>") "",
     Option [] ["cpu"] (ReqArg (\cpu opts -> opts { _cpu = Just cpu }) "<arg>") ""
   ]
 
 
-compile :: (MonadError String m, MonadIO m) => [String] -> m ()
-compile args = do
+compileRuntime :: (MonadError String m, MonadIO m) => [String] -> m ()
+compileRuntime args = do
 
-  (options, fileNames) <- case getOpt Permute optionDescriptions args of
+  (options, _) <- case getOpt Permute optionDescriptions args of
     (o, n, [])   -> return (foldl (flip id) defaultOptions o, n)
     (_, _, errs) -> throwError (concat errs ++ usageInfo "Usage: ..." optionDescriptions)
 
@@ -57,16 +54,6 @@ compile args = do
 
     target' -> throwError $ "invalid target: " ++ target'
 
-  let processOptions = Top.defaultOptions {
-      Top._debug = _debug options,
-      Top._target = target
-    }
+  Top.compileRuntime target
 
-  case fileNames of
-    [] -> throwError "no input files"
-
-    [fileName] -> do
-      Top.compileFile processOptions fileName
-      liftIO $ putStrLn "successfully compiled!"
-
-    _ -> throwError "more than one input file specified"
+  liftIO $ putStrLn "successfully compiled runtime!"

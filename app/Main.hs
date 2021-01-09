@@ -6,9 +6,9 @@ import Control.Monad.Except
 import System.Exit
 import System.Environment
 
-import Compile
-import CompileRuntime
-import Repl
+import Main.Compile
+import Main.CompileRuntime
+import Main.Repl
 
 
 main :: IO ()

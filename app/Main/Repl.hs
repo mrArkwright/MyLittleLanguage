@@ -1,4 +1,4 @@
-module Repl (repl) where
+module Main.Repl (repl) where
 
 import Control.Monad.Trans
 
