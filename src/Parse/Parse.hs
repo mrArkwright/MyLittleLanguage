@@ -214,7 +214,7 @@ parsePointer = do
   endPos <- getPosition
   let loc = sourcePosToLoc startPos endPos
 
-  return $ LiteralExpression (Pointer value) loc
+  return $ LiteralExpression (LiteralPointer value) loc
 
 
 parseInteger :: Parser Expression
@@ -227,7 +227,7 @@ parseInteger = do
   endPos <- getPosition
   let loc = sourcePosToLoc startPos endPos
 
-  return $ LiteralExpression (Int value) loc
+  return $ LiteralExpression (LiteralInt value) loc
 
 
 parseInteger8 :: Parser Expression
@@ -240,7 +240,7 @@ parseInteger8 = do
   endPos <- getPosition
   let loc = sourcePosToLoc startPos endPos
 
-  return $ LiteralExpression (Int8 value) loc
+  return $ LiteralExpression (LiteralInt8 value) loc
 
 
 parseFloat :: Parser Expression
@@ -253,7 +253,7 @@ parseFloat = do
   endPos <- getPosition
   let loc = sourcePosToLoc startPos endPos
 
-  return $ LiteralExpression (Float value) loc
+  return $ LiteralExpression (LiteralFloat value) loc
 
 
 parseSymbolReference :: Parser Expression

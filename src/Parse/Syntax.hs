@@ -62,8 +62,8 @@ data Expression
 
 
 data Literal
-  = Pointer Integer
-  | Int Integer
-  | Int8 Integer
-  | Float Double
+  = LiteralPointer Integer
+  | LiteralInt Integer
+  | LiteralInt8 Integer
+  | LiteralFloat Double
   deriving (Eq, Ord, Show)

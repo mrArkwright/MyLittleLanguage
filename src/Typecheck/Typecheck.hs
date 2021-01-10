@@ -155,10 +155,10 @@ typecheckExpression (Rename.Do statements loc) = do
 
 
 literalType :: Literal -> Type
-literalType (Pointer _) = TypePointer
-literalType (Int _) = TypeInt
-literalType (Int8 _) = TypeInt8
-literalType (Float _) = TypeFloat
+literalType (LiteralPointer _) = TypePointer
+literalType (LiteralInt _) = TypeInt
+literalType (LiteralInt8 _) = TypeInt8
+literalType (LiteralFloat _) = TypeFloat
 
 
 findSymbol :: MonadState SymbolTable m => Symbol -> m (Maybe Type)

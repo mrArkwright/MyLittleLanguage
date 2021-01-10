@@ -161,10 +161,10 @@ codegenStatement (StatementDefinition definition _ _) = do
 
 
 codegenLiteral :: Literal -> LLVM.Constant.Constant
-codegenLiteral (Pointer value) = LLVM.Constant.IntToPtr (LLVM.Constant.Int 32 value) (LLVM.PointerType (LLVM.IntegerType 32) (LLVM.AddrSpace 0))
-codegenLiteral (Int value) = LLVM.Constant.Int 32 value
-codegenLiteral (Int8 value) = LLVM.Constant.Int 8 value
-codegenLiteral (Float value) = LLVM.Constant.Float (LLVM.Double value)
+codegenLiteral (LiteralPointer value) = LLVM.Constant.IntToPtr (LLVM.Constant.Int 32 value) (LLVM.PointerType (LLVM.IntegerType 32) (LLVM.AddrSpace 0))
+codegenLiteral (LiteralInt value) = LLVM.Constant.Int 32 value
+codegenLiteral (LiteralInt8 value) = LLVM.Constant.Int 8 value
+codegenLiteral (LiteralFloat value) = LLVM.Constant.Float (LLVM.Double value)
 
 
 
